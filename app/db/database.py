@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from app.models.users import User
+from app.models.users import User, RefreshToken
 
 #Nạp file .env
 load_dotenv()
@@ -21,7 +21,7 @@ async def connect_db():
   
   try:
     db_client = AsyncIOMotorClient(MONGO_URL)
-    await init_beanie(database=db_client[DB_NAME], document_models=[User])
+    await init_beanie(database=db_client[DB_NAME], document_models=[User, RefreshToken])
     logging.info("Connect to database successfully.")
     
   except Exception as e:

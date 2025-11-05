@@ -3,9 +3,13 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import HTTPException, status, Depends
+from dotenv import load_dotenv
+from app.models.users import RefreshToken
+from bson import ObjectId
 
 import os
 
+load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 
@@ -30,15 +34,32 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def create_refresh_token(data: dict):
+async def create_refresh_token(data: dict):
     expire = datetime.now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode = {"sub": data["sub"], "exp": expire, "type": "refresh"}
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    
+    refresh_token_doc = RefreshToken(
+        token=encoded_jwt,
+        user_id=ObjectId(data["sub"]),
+        expires_at=expire
+    )
+    await refresh_token_doc.insert()
+    
     return encoded_jwt
 
-def verify_refresh_token(refresh_token: str):
+async def verify_refresh_token(refresh_token: str):
     try:
-        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=ALGORITHM)
+        token_doc = await RefreshToken.find_one({
+            "token": refresh_token,
+            "is_active": True,
+            "expires_at": {"$gt": datetime.now()}
+        })
+        
+        if not token_doc:
+            raise HTTPException(status_code=401, detail="Invalid or expired refresh token. Please login again!!!")
+        
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "refresh":
             raise HTTPException(status_code=401, detail="Invalid refresh token. Please remove token and login again!!!")
         user_id = payload.get("sub")
@@ -47,7 +68,6 @@ def verify_refresh_token(refresh_token: str):
         return user_id
     except Exception as e:
         raise e
-        
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
@@ -59,3 +79,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Token invalid or expired. Please refresh token!!!")
 
+async def revoke_refresh_token(refresh_token: str):
+    """Vô hiệu hóa refresh token"""
+    token_doc = await RefreshToken.find_one({"token": refresh_token})
+    if token_doc:
+        await token_doc.set({"is_active": False})
+
+async def revoke_all_user_tokens(user_id: str):
+    """Vô hiệu hóa tất cả refresh tokens của user"""
+    await RefreshToken.find({
+        "user_id": ObjectId(user_id),
+        "is_active": True
+    }).update({"$set": {"is_active": False}})
