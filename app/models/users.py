@@ -8,16 +8,14 @@ class RefreshToken(Document):
     token: str = Field(..., description="JWT refresh token")
     user_id: PydanticObjectId = Field(..., description="User ID")
     expires_at: datetime = Field(..., description="Token expiration time")
-    is_active: bool = Field(default=True, description="Token status")
     created_at: datetime = Field(default_factory=datetime.now)
     
     class Settings:
         name = "refresh_tokens"
         indexes = [
             "token",
-            "user_id", 
-            "is_active",
-            IndexModel([("user_id", 1), ("is_active", 1)])  # ✅ đúng
+            "user_id",
+            IndexModel([("expires_at", 1)], expireAfterSeconds=0)
         ]
 
 class User(Document):
