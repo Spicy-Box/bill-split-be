@@ -1,16 +1,15 @@
-from datetime import date
-import datetime
+from datetime import datetime, timedelta, date
 from typing import Optional
 from beanie import Document, PydanticObjectId
-from pydantic import ConfigDict, EmailStr, Field
-
+from pydantic import EmailStr, Field
+from pymongo import IndexModel
 
 class RefreshToken(Document):
     token: str = Field(..., description="JWT refresh token")
     user_id: PydanticObjectId = Field(..., description="User ID")
-    expires_at: datetime.datetime = Field(..., description="Token expiration time")
+    expires_at: datetime = Field(..., description="Token expiration time")
     is_active: bool = Field(default=True, description="Token status")
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    created_at: datetime = Field(default_factory=datetime.now)
     
     class Settings:
         name = "refresh_tokens"
@@ -18,16 +17,28 @@ class RefreshToken(Document):
             "token",
             "user_id", 
             "is_active",
-            [("user_id", 1), ("is_active", 1)]
+            IndexModel([("user_id", 1), ("is_active", 1)])  # ✅ đúng
         ]
 
 class User(Document):
+    email: EmailStr
+    first_name: str
+    last_name: str
+    phone: Optional[str] = Field(default=None, max_length=11)
+    dob: date
+    password: str
+
+    class Settings:
+        name = "users"
+
+class OtpCode(Document):
   email: EmailStr
-  first_name: str
-  last_name: str
-  phone: Optional[str] = Field(default=None, max_length=11)
-  dob: date
-  password: str
-  
+  code: str
+  created_at: datetime = Field(default_factory=datetime.utcnow)
+
   class Settings:
-    name = "users"
+      name = "otp_codes"
+      indexes = [
+          IndexModel([("created_at", 1)], expireAfterSeconds=600)
+      ]
+
