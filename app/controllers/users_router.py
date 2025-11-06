@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from datetime import datetime
 
-from app.dto.users import UserIn, UserOut, LoginRequest, UserUpdate, ForgotPasswordRequest
+from app.dto.users import UserIn, UserOut, LoginRequest, UserUpdate, ForgotPasswordRequest, ResetPasswordRequest
 from app.models.users import User, OtpCode
 from pwdlib import PasswordHash
 
@@ -133,7 +133,7 @@ async def logout_all_devices(current_user: str = Depends(get_current_user)):
   except Exception as e:
     raise e
 
-@router.post("/forgot-password", response_model=ReponseWrapper[dict])
+@router.post("/forgot-password", response_model=ReponseWrapper[dict], status_code=status.HTTP_200_OK)
 async def forgot_password(data: ForgotPasswordRequest, background_tasks: BackgroundTasks):
     email = data.email
     user = await User.find_one(User.email == str(email))
@@ -183,8 +183,11 @@ async def forgot_password(data: ForgotPasswordRequest, background_tasks: Backgro
     )
     return ReponseWrapper(message="OTP code sent to email successfully", data={})
 
-@router.post("/reset-password", response_model=ReponseWrapper[dict])
-async def reset_password(email: str, code: str, new_password: str):
+@router.post("/reset-password", response_model=ReponseWrapper[dict], status_code=status.HTTP_200_OK)
+async def reset_password(data: ResetPasswordRequest):
+  email = data.email
+  code = data.code
+  new_password = data.new_password
   try:
     otp_record = await OtpCode.find_one(OtpCode.email == email)
     if not otp_record or otp_record.code != code:

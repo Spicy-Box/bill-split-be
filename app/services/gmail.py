@@ -3,11 +3,15 @@ from starlette.responses import JSONResponse
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from pydantic import EmailStr, BaseModel
 from typing import List
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 conf = ConnectionConfig(
     MAIL_USERNAME = "tuananhtramtinh",
-    MAIL_PASSWORD = "wlck ouik ljgt pkpv",
-    MAIL_FROM = "tuananhtramtinh@gmail.com",
+    MAIL_PASSWORD = str(os.getenv("MAIL_PASSWORD")),
+    MAIL_FROM = str(os.getenv("MAIL_FROM")),
     MAIL_PORT = 587,
     MAIL_SERVER = "smtp.gmail.com",
     MAIL_FROM_NAME="Divvy HCMUT",
