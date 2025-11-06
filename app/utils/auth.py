@@ -6,6 +6,7 @@ from fastapi import HTTPException, status, Depends
 from dotenv import load_dotenv
 from app.models.users import RefreshToken
 from bson import ObjectId
+import random
 
 import os
 
@@ -91,3 +92,6 @@ async def revoke_all_user_tokens(user_id: str):
         "user_id": ObjectId(user_id),
         "is_active": True
     }).update({"$set": {"is_active": False}})
+
+def generate_otp_secret():
+    return random.randint(100000, 999999)

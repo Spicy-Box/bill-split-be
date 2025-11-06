@@ -30,3 +30,11 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = Field(None, min_length=10, max_length=11, examples=["0696969696"])
     password: Optional[str] = Field(None, examples=["lovuongdaide123"])
     dob: Optional[date] = Field(None, examples=["1969-06-09"])
+
+class OtpCode(BaseModel):
+    email: EmailStr = Field(..., examples=["lodaide@gmail.com"])
+    code : str = Field(..., examples=["123456"])
+    create_at: date = Field(..., examples=["2024-12-31:17:59:59"])
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
