@@ -32,7 +32,7 @@ class User(Document):
 class OtpCode(Document):
   email: EmailStr
   code: str
-  created_at: datetime = Field(default_factory=datetime.utcnow)
+  created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
   class Settings:
       name = "otp_codes"
