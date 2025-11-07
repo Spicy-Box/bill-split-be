@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, timezone, date
 from typing import Optional
 from beanie import Document, PydanticObjectId
 from pydantic import EmailStr, Field
@@ -8,7 +8,7 @@ class RefreshToken(Document):
     token: str = Field(..., description="JWT refresh token")
     user_id: PydanticObjectId = Field(..., description="User ID")
     expires_at: datetime = Field(..., description="Token expiration time")
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
     class Settings:
         name = "refresh_tokens"
