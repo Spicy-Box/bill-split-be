@@ -36,3 +36,4 @@ jobs:
             docker stop prod-divvy
             docker rm prod-divvy
             docker run -dp 8000:8000 --name prod-divvy tuanemtramtinh/divvy-backend:v0
+            docker image prune -f
