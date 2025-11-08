@@ -1,0 +1,38 @@
+name: Deploy Production
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create .env file
+        run: echo "${{secrets.ENV_PRODUCTION}}" > .env
+      - name: Build docker image
+        run: docker build --platform linux/amd64 -t tuanemtramtinh/divvy-backend:v0 .
+      - name: Login to DockerHub
+        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+      - name: Push docker image
+        run: docker push tuanemtramtinh/divvy-backend:v0
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Executing remote ssh commands using password
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST_PRODUCTION }}
+          username: ${{ secrets.USERNAME_PRODUCTION }}
+          password: ${{ secrets.PASSWORD_PRODUCTION }}
+          port: ${{ secrets.PORT_PRODUCTION }}
+          script: |
+            docker login
+            docker pull tuanemtramtinh/divvy-backend:v0
+            docker stop prod-divvy
+            docker rm prod-divvy
+            docker run -dp 8000:8000 --name prod-divvy tuanemtramtinh/divvy-backend:v0
