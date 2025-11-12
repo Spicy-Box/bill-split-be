@@ -7,7 +7,7 @@ from beanie import PydanticObjectId
 from app.controllers.users_router import (
     create_user, login_user, forgot_password, reset_password
 )
-from app.dto.users import UserIn, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest
+from app.dto.users import UserIn, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest, TokenResponse
 from app.models.users import User, OtpCode
 
 
@@ -97,9 +97,9 @@ class TestLoginUser:
             result = await login_user(login_data)
 
             assert result.message == "Login successful"
-            assert result.data["access_token"] == "access_token_123" 
-            assert result.data["refresh_token"] == "refresh_token_123"
-            assert result.data["token_type"] == "bearer"
+            assert result.data.access_token == "access_token_123" 
+            assert result.data.refresh_token == "refresh_token_123"
+            assert result.data.token_type == "bearer"
 
             mock_user_model.find_one.assert_called_once()
             
@@ -246,9 +246,9 @@ class TestResetPassword:
             result = await reset_password(reset_password_data)
 
             assert result.message == "Change password and login successful"
-            assert result.data["access_token"] == "new_access_token"
-            assert result.data["refresh_token"] == "new_refresh_token"
-            assert result.data["token_type"] == "bearer"
+            assert result.data.access_token == "new_access_token"
+            assert result.data.refresh_token == "new_refresh_token"
+            assert result.data.token_type == "bearer"
 
             mock_otp_model.find_one.assert_called_once()
 

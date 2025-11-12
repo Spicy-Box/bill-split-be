@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from datetime import datetime
 
-from app.dto.users import UserIn, UserOut, LoginRequest, UserUpdate, ForgotPasswordRequest, ResetPasswordRequest
+from app.dto.users import UserIn, UserOut, LoginRequest, UserUpdate, ForgotPasswordRequest, ResetPasswordRequest, TokenResponse
 from app.models.users import User, OtpCode
 from pwdlib import PasswordHash
 
@@ -77,7 +77,7 @@ async def delete_user(user_id: str, current_user: str = Depends(get_current_user
   except Exception as e:
     raise e
   
-@router.post("/login", response_model=ReponseWrapper[dict], description="User login", status_code=status.HTTP_200_OK)
+@router.post("/login", response_model=ReponseWrapper[TokenResponse], description="User login", status_code=status.HTTP_200_OK)
 async def login_user(data:LoginRequest):
   try:
     user = await User.find_one(User.email == data.email)
@@ -87,23 +87,24 @@ async def login_user(data:LoginRequest):
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = await create_refresh_token(data={"sub": str(user.id)})
     
-    return ReponseWrapper(message="Login successful", data={
-      "access_token": access_token,
-      "refresh_token": refresh_token,
-      "token_type": "bearer"
-    })
+    return ReponseWrapper(message="Login successful", data=TokenResponse(
+      access_token=access_token,
+      refresh_token=refresh_token,
+      token_type="bearer"
+      ))
   except Exception as e:
     raise e
   
-@router.post("/refresh", response_model=ReponseWrapper[dict], description="Refresh access token", status_code=status.HTTP_200_OK)
+@router.post("/refresh", response_model=ReponseWrapper[TokenResponse], description="Refresh access token", status_code=status.HTTP_200_OK)
 async def refresh_access_token(refresh_token: str):
   try:
     user_id = await verify_refresh_token(refresh_token=refresh_token)
     access_token = create_access_token(data={"sub": user_id})  
-    return ReponseWrapper(message="Access token refreshed successfully", data={
-      "access_token": access_token,
-      "token_type": "bearer"
-    })
+    return ReponseWrapper(message="Access token refreshed successfully", data=TokenResponse(
+      access_token=access_token,
+      refresh_token=refresh_token,
+      token_type="bearer"
+      ))
   except Exception as e:
     raise e
   
@@ -183,7 +184,7 @@ async def forgot_password(data: ForgotPasswordRequest, background_tasks: Backgro
     )
     return ReponseWrapper(message="OTP code sent to email successfully", data={})
 
-@router.post("/reset-password", response_model=ReponseWrapper[dict], status_code=status.HTTP_200_OK)
+@router.post("/reset-password", response_model=ReponseWrapper[TokenResponse], status_code=status.HTTP_200_OK)
 async def reset_password(data: ResetPasswordRequest):
   email = data.email
   code = data.code
@@ -200,11 +201,11 @@ async def reset_password(data: ResetPasswordRequest):
     await otp_record.delete()
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = await create_refresh_token(data={"sub": str(user.id)})
-    return ReponseWrapper(message="Change password and login successful", data={
-      "access_token": access_token,
-      "refresh_token": refresh_token,
-      "token_type": "bearer"
-    })
+    return ReponseWrapper(message="Change password and login successful", data=TokenResponse(
+      access_token=access_token,
+      refresh_token=refresh_token,
+      token_type="bearer"
+      ))
   except Exception as e:
     raise e
 
