@@ -4,37 +4,37 @@ from beanie import PydanticObjectId
 from typing import Optional
 
 class UserIn(BaseModel):
-  first_name: str = Field(..., examples=["Lo"])
-  last_name: str = Field(..., examples=["Vuong"])
-  email: EmailStr = Field(..., examples=["lodaide@gmail.com"])
-  phone: str = Field(min_length=10, max_length=11, examples=["0696969696"])
-  password: str = Field(..., examples=["lovuongdaide123"])
-  dob: date = Field(..., examples=["1969-06-09"])
+  first_name: str = Field(..., examples=["Nguyen"])
+  last_name: str = Field(..., examples=["An"])
+  email: EmailStr = Field(..., examples=["nguyen.an@example.com"])
+  phone: str = Field(min_length=10, max_length=11, examples=["0901234567"])
+  password: str = Field(..., examples=["NguyenAn@123"])
+  dob: date = Field(..., examples=["1990-01-15"])
   
 class UserOut(BaseModel):
   id: PydanticObjectId
-  first_name: str = Field(..., examples=["Lo"])
-  last_name: str = Field(..., examples=["Vuong"])
-  email: EmailStr = Field(..., examples=["lodaide@gmail.com"])
-  phone: str = Field(min_length=10, max_length=11, examples=["0696969696"])
-  dob: date = Field(..., examples=["1969-06-09"])
+  first_name: str = Field(..., examples=["Nguyen"])
+  last_name: str = Field(..., examples=["An"])
+  email: EmailStr = Field(..., examples=["nguyen.an@example.com"])
+  phone: str = Field(min_length=10, max_length=11, examples=["0901234567"])
+  dob: date = Field(..., examples=["1990-01-15"])
 
 class LoginRequest(BaseModel):
-  email: EmailStr = Field(..., examples=["lodaide@gmail.com"])
-  password: str = Field(..., examples=["lovuongdaide123"])
+  email: EmailStr = Field(..., examples=["nguyen.an@example.com"])
+  password: str = Field(..., examples=["NguyenAn@123"])
   
 class UserUpdate(BaseModel):
-    first_name: Optional[str] = Field(None, examples=["Lo"])
-    last_name: Optional[str] = Field(None, examples=["Vuong"])
-    email: Optional[EmailStr] = Field(None, examples=["lodaide@gmail.com"])
-    phone: Optional[str] = Field(None, min_length=10, max_length=11, examples=["0696969696"])
-    password: Optional[str] = Field(None, examples=["lovuongdaide123"])
-    dob: Optional[date] = Field(None, examples=["1969-06-09"])
+    first_name: Optional[str] = Field(None, examples=["Nguyen"])
+    last_name: Optional[str] = Field(None, examples=["An"])
+    email: Optional[EmailStr] = Field(None, examples=["nguyen.an@example.com"])
+    phone: Optional[str] = Field(None, min_length=10, max_length=11, examples=["0901234567"])
+    password: Optional[str] = Field(None, examples=["NguyenAn@123"])
+    dob: Optional[date] = Field(None, examples=["1990-01-15"])
 
 class OtpCode(BaseModel):
-    email: EmailStr = Field(..., examples=["lodaide@gmail.com"])
-    code : str = Field(..., examples=["123456"])
-    create_at: date = Field(..., examples=["2024-12-31:17:59:59"])
+    email: EmailStr = Field(..., examples=["nguyen.an@example.com"])
+    code : str = Field(..., examples=["654321"])
+    create_at: date = Field(..., examples=["2025-12-31"])
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
