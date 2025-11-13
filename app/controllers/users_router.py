@@ -45,10 +45,10 @@ async def create_user(data: UserIn):
   except Exception as e:
     raise e
 
-@router.put("/{user_id}", response_model=ReponseWrapper[UserOut], description="Update user by ID", status_code=status.HTTP_200_OK)
-async def update_user(user_id: str, data: UserUpdate, current_user: str = Depends(get_current_user)):
+@router.put("/update-user", response_model=ReponseWrapper[UserOut], description="Update user by ID", status_code=status.HTTP_200_OK)
+async def update_user(data: UserUpdate, current_user: str = Depends(get_current_user)):
     try:
-        user = await User.get(user_id)
+        user = await User.get(current_user)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         elif str(user.id) != current_user:
@@ -65,13 +65,11 @@ async def update_user(user_id: str, data: UserUpdate, current_user: str = Depend
 
 
 @router.delete("/{user_id}", response_model=ReponseWrapper[UserOut], description="Delete user by ID", status_code=status.HTTP_200_OK)
-async def delete_user(user_id: str, current_user: str = Depends(get_current_user)):
+async def delete_user(user_id: str):
   try:
     user = await User.get(user_id)
     if not user:
       raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    elif str(user.id) != current_user:
-      raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this user")
     await user.delete()
     return ReponseWrapper(message="User deleted successfully", data=user)
   except Exception as e:
