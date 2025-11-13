@@ -32,7 +32,7 @@ async def get_user_by_id(user_id: str):
   except Exception as e:
     raise e
 
-@router.post("/create-user", response_model=ReponseWrapper[UserOut], description="Create a new user", status_code=201)
+@router.post("/create-user", response_model=ReponseWrapper[UserOut], description="Signup", status_code=201)
 async def create_user(data: UserIn):
   try:
     data.password = hash_password(data.password)
