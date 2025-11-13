@@ -15,7 +15,7 @@ def custom_openapi():
         return app.openapi_schema
     openapi_schema = get_openapi(
         title="Divvy App",
-        version="1.0.0",
+        version="1.0.1",
         description="API documentation for Divvy App. To use protected endpoints:\n1. Call /users/login to get access_token\n2. Click 'Authorize' button above\n3. Enter 'Bearer {your_access_token}' or just '{your_access_token}'\n4. Now you can use protected endpoints",
         routes=app.routes,
     )
