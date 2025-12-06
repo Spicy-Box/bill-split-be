@@ -50,7 +50,7 @@ class LoginResponse(BaseModel):
   first_name: str
   last_name: str
   phone: str
-  dob: str
+  dob: date
   access_token: str
   refresh_token: str
 
