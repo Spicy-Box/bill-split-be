@@ -46,7 +46,7 @@ API documentation for Divvy App.
 app.openapi = custom_openapi
 
 origins = [
-    "*"
+    "http://localhost:8081",
 ]
 
 app.add_middleware(
