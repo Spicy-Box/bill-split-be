@@ -45,7 +45,7 @@ class ResetPasswordRequest(BaseModel):
   new_password: str
     
 class LoginResponse(BaseModel):
-  id: str
+  id: PydanticObjectId
   email: EmailStr
   first_name: str
   last_name: str
