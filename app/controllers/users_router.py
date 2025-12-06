@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from datetime import datetime
 
-from app.dto.users import UserIn, UserOut, LoginRequest, UserUpdate, ForgotPasswordRequest, ResetPasswordRequest, TokenResponse
+from app.dto.users import LoginResponse, UserIn, UserOut, LoginRequest, UserUpdate, ForgotPasswordRequest, ResetPasswordRequest, TokenResponse
 from app.models.users import User, OtpCode
 from pwdlib import PasswordHash
 
@@ -75,20 +75,25 @@ async def delete_user(user_id: str):
   except Exception as e:
     raise e
   
-@router.post("/login", response_model=ReponseWrapper[TokenResponse], description="User login", status_code=status.HTTP_200_OK)
+@router.post("/login", response_model=ReponseWrapper[LoginResponse], description="User login", status_code=status.HTTP_200_OK)
 async def login_user(data:LoginRequest):
   try:
-    user = await User.find_one(User.email == data.email)
+    user: User = await User.find_one(User.email == data.email)
     if not user or not verify_password(data.password, user.password):
       raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = await create_refresh_token(data={"sub": str(user.id)})
     
-    return ReponseWrapper(message="Login successful", data=TokenResponse(
+    return ReponseWrapper(message="Login successful", data=LoginResponse(
+      id=user.id,
+      email=user.email,
+      first_name=user.first_name,
+      last_name=user.last_name,
+      phone=user.phone,
+      dob=user.dob,
       access_token=access_token,
-      refresh_token=refresh_token,
-      token_type="bearer"
+      refresh_token=refresh_token
       ))
   except Exception as e:
     raise e
