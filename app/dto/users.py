@@ -43,6 +43,13 @@ class ResetPasswordRequest(BaseModel):
   email: EmailStr
   code: str
   new_password: str
+
+class VerifyOtpRequest(BaseModel):
+  email: EmailStr
+  code: str
+
+class ChangePasswordRequest(BaseModel):
+  new_password: str
     
 class LoginResponse(BaseModel):
   id: PydanticObjectId

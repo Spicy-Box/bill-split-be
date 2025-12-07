@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from datetime import datetime
 
-from app.dto.users import LoginResponse, UserIn, UserOut, LoginRequest, UserUpdate, ForgotPasswordRequest, ResetPasswordRequest, TokenResponse
+from app.dto.users import LoginResponse, UserIn, UserOut, LoginRequest, UserUpdate, ForgotPasswordRequest, ResetPasswordRequest, TokenResponse, VerifyOtpRequest, ChangePasswordRequest
 from app.models.users import User, OtpCode
 from pwdlib import PasswordHash
 
@@ -187,28 +187,79 @@ async def forgot_password(data: ForgotPasswordRequest, background_tasks: Backgro
     )
     return ReponseWrapper(message="OTP code sent to email successfully", data={})
 
-@router.post("/reset-password", response_model=ReponseWrapper[TokenResponse], status_code=status.HTTP_200_OK)
-async def reset_password(data: ResetPasswordRequest):
-  email = data.email
-  code = data.code
-  new_password = data.new_password
+@router.post("/verify-otp", response_model=ReponseWrapper[TokenResponse], status_code=status.HTTP_200_OK, description="Verify OTP code and return access token")
+async def verify_otp(data: VerifyOtpRequest):
+  """
+  Verify OTP code sent to email. If valid, returns access_token and refresh_token.
+  """
   try:
+    email = data.email
+    code = data.code
+    
     otp_record = await OtpCode.find_one(OtpCode.email == email)
     if not otp_record or otp_record.code != code:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired OTP code")
+    
     user = await User.find_one(User.email == email)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User with this email does not exist")
-    user.password = hash_password(new_password)
-    await user.save()
+    
+    # Delete OTP after successful verification
     await otp_record.delete()
+    
+    # Generate tokens
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = await create_refresh_token(data={"sub": str(user.id)})
-    return ReponseWrapper(message="Change password and login successful", data=TokenResponse(
+    
+    return ReponseWrapper(message="OTP verified successfully", data=TokenResponse(
       access_token=access_token,
       refresh_token=refresh_token,
       token_type="bearer"
-      ))
+    ))
   except Exception as e:
     raise e
+
+@router.post("/change-password", response_model=ReponseWrapper[dict], status_code=status.HTTP_200_OK, description="Change password using access token")
+async def change_password(data: ChangePasswordRequest, current_user: str = Depends(get_current_user)):
+  """
+  Change user password. Requires valid access token in Authorization header.
+  """
+  try:
+    user = await User.get(current_user)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    # Update password
+    user.password = hash_password(data.new_password)
+    await user.save()
+    
+    return ReponseWrapper(message="Password changed successfully", data={})
+  except Exception as e:
+    raise e
+
+# Deprecated: Use /verify-otp and /change-password instead
+# @router.post("/reset-password", response_model=ReponseWrapper[TokenResponse], status_code=status.HTTP_200_OK)
+# async def reset_password(data: ResetPasswordRequest):
+#   email = data.email
+#   code = data.code
+#   new_password = data.new_password
+#   try:
+#     otp_record = await OtpCode.find_one(OtpCode.email == email)
+#     if not otp_record or otp_record.code != code:
+#         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired OTP code")
+#     user = await User.find_one(User.email == email)
+#     if not user:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User with this email does not exist")
+#     user.password = hash_password(new_password)
+#     await user.save()
+#     await otp_record.delete()
+#     access_token = create_access_token(data={"sub": str(user.id)})
+#     refresh_token = await create_refresh_token(data={"sub": str(user.id)})
+#     return ReponseWrapper(message="Change password and login successful", data=TokenResponse(
+#       access_token=access_token,
+#       refresh_token=refresh_token,
+#       token_type="bearer"
+#       ))
+#   except Exception as e:
+#     raise e
 
