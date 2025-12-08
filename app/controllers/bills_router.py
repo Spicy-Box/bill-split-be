@@ -3,11 +3,13 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from beanie import PydanticObjectId
+from beanie.operators import In
 from bson import ObjectId
 
 from app.dto.base import ReponseWrapper
-from app.dto.bills import BillIn, BillOut, BillUpdate
+from app.dto.bills import BillIn, BillOut, BillUpdate, BillParticipantUpdateIn
 from app.models.bills import Bills
+from app.models.users import User
 from app.utils.auth import get_current_user
 
 
@@ -110,3 +112,34 @@ async def delete_bill(bill_id: str, current_user: str = Depends(get_current_user
 
     await bill.delete()
     return ReponseWrapper(message="Bill deleted successfully", data=bill)
+
+@router.post(
+    "/addParticipant/{bill_id}",
+    response_model=ReponseWrapper[BillOut],
+    status_code=status.HTTP_200_OK,
+    description="Add a participant to a bill")
+async def add_participant(bill_id: str, request: BillParticipantUpdateIn,current_user: str = Depends(get_current_user)):
+    owner_id = _parse_object_id(current_user)
+    list_of_participants = request.participant_id
+    bills = await Bills.get(bill_id)
+
+    if not bills:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found")
+    if bills.owner_id != owner_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner can add participants to this bill")
+    existing_participants = await User.find(
+        In(User.id, list_of_participants)
+    ).to_list()
+    if len(existing_participants) != len(list_of_participants):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more participant IDs are invalid")
+    already_in_bill = set(bills.participants).intersection(set(list_of_participants))
+    if already_in_bill:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"There are one or more participants already in the bill: {', '.join(str(pid) for pid in already_in_bill)}",
+        )
+
+    updated_participants = list(set(bills.participants + list_of_participants))
+    bills.participants = updated_participants
+    await bills.save()
+    return ReponseWrapper(message="Participants added successfully", data=bills)

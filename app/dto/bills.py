@@ -46,3 +46,15 @@ class BillOut(BaseModel):
             }
         }
 
+class BillParticipantUpdateIn(BaseModel):
+    participant_id: List[PydanticObjectId] = Field(..., examples=[["60f5f8a3b9c3f0a1b2c3d4e5", "60f5f8a3b9c3f0a1b2c3d4e6"]])
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "participant_id": [
+                    "60f5f8a3b9c3f0a1b2c3d4e5",
+                    "60f5f8a3b9c3f0a1b2c3d4e6",
+                ],
+            }
+        }
