@@ -36,7 +36,7 @@
 
 - Khởi động server phát triển:
   ```bash
-  uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+  fastapi dev
   ```
 - OpenAPI / Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`

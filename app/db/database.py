@@ -10,6 +10,8 @@ from app.models.users import User, RefreshToken, OtpCode
 
 from app.models.bills import Bills
 
+from app.models.events import Events
+
 #Nạp file .env
 load_dotenv()
 
@@ -23,7 +25,7 @@ async def connect_db():
   
   try:
     db_client = AsyncIOMotorClient(MONGO_URL)
-    await init_beanie(database=db_client[DB_NAME], document_models=[User, RefreshToken, OtpCode, Bills])
+    await init_beanie(database=db_client[DB_NAME], document_models=[User, RefreshToken, OtpCode, Bills, Events])
     logging.info("Connect to database successfully.")
     
   except Exception as e:

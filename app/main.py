@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
-from app.controllers import users_router, bills_router
+from app.controllers import users_router, bills_router, events_router
 from app.db.database import lifespan
 from app.dto.users import UserIn
 from app.models.users import User
@@ -59,3 +59,4 @@ app.add_middleware(
 
 app.include_router(users_router.router)
 app.include_router(bills_router.router)
+app.include_router(events_router.router)
