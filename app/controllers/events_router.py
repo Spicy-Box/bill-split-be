@@ -1,9 +1,11 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from datetime import datetime, timezone
+from bson import ObjectId
 
 from app.models.events import Events
 from app.models.users import User
+from app.models.bills import Bills
 from app.dto.events import EventIn, EventOut, EventsOut, EventDetailOut, EventUpdate
 from app.dto.base import ReponseWrapper
 
@@ -104,6 +106,36 @@ async def delete_event(event_id: str, current_user: str = Depends(get_current_us
         return ReponseWrapper(
             message="Delete event successfully",
             data={}
+        )
+    except Exception as e:
+        raise e
+
+@router.post("/add-bill/", response_model=ReponseWrapper[EventDetailOut], status_code=status.HTTP_200_OK)
+async def add_bill_to_event(event_id: str, bill_id: str, current_user: str = Depends(get_current_user)):
+    try:
+        event = await Events.get(event_id)
+        if not event:
+            raise HTTPException(status_code=404, detail="Event not found")   
+        bill = await Bills.get(bill_id)
+        if not bill:
+            raise HTTPException(status_code=404, detail="Bill not found")
+        checking = await Events.find_one(
+            {"bills._id": ObjectId(bill_id)}
+        )
+        if checking:
+            raise HTTPException(status_code=400, detail="Bill already in event")
+        
+        
+        event.bills.append(bill)
+        await event.save()
+        result = EventDetailOut(
+            **event.model_dump(),
+            totalAmount= event.total_amount,
+            createdAt= event.created_at
+        )
+        return ReponseWrapper(
+            message="Bill added to event successfully",
+            data=result
         )
     except Exception as e:
         raise e
