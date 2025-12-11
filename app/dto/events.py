@@ -8,7 +8,7 @@ from app.models.bills import Bills
 
 class EventIn(BaseModel):
     name: str = Field(..., description="Name of the event", examples=["Birthday Party"])
-    description: str = Field(..., description="Description of event", examples=["Đi nhậu cuối tuần"])
+    # description: str = Field(..., description="Description of event", examples=["Đi nhậu cuối tuần"])
     currency: CurrencyEnum = Field(..., description="Currency type for the event", examples=[1])
     participants: List[str] = Field(..., description="List of participant name", examples=[["Alice", "Bob", "Charlie"]])
 
