@@ -15,6 +15,7 @@ class CurrencyEnum(IntEnum):
 class Events(Document):
     name: str = Field(..., description="Name of the event")
     currency: CurrencyEnum = Field(..., description="Currency type for the event")
+    creator: PydanticObjectId = Field(..., description="Creator of the events")
     description: str = Field(..., description="Description of event")
     participants: list[str] = Field(..., description="List of participant name")
     total_amount: float = Field(..., ge=0, description="Total amount of money for the event")

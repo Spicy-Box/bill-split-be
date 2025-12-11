@@ -21,6 +21,7 @@ async def create_event(event_in: EventIn, current_user: str = Depends(get_curren
         event_in.participants.append(user.first_name)
         event = Events(
             **event_in.model_dump(),
+            creator=user.id,    
             total_amount=0.0,
             created_at=datetime.now(timezone.utc)
         )
