@@ -15,7 +15,6 @@ router = APIRouter(prefix='/events', tags=["Events"])
 
 @router.post("/", response_model=ReponseWrapper[EventOut], status_code=status.HTTP_201_CREATED)
 async def create_event(event_in: EventIn, current_user: str = Depends(get_current_user)):
-    print("hello")
     try:
         user = await User.get(current_user)
         
@@ -43,7 +42,9 @@ async def create_event(event_in: EventIn, current_user: str = Depends(get_curren
 @router.get("/", response_model=ReponseWrapper[List[EventsOut]], status_code=status.HTTP_200_OK)
 async def find_events(current_user: str = Depends(get_current_user)):
     try:
-        list_events = await Events.find_all().to_list()
+        user = await User.get(current_user)
+        
+        list_events = await Events.find({"creator": user.id}).to_list()
         result = [EventsOut(
             **e.model_dump(),
             participantsCount= len(e.participants),
