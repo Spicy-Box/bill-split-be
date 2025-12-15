@@ -1,9 +1,14 @@
 from datetime import datetime, timezone
+import os
 from typing import Dict
 from collections import defaultdict
 import uuid
+import base64
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from dotenv import load_dotenv
+from fastapi.security import api_key
+from openai import OpenAI
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from beanie import PydanticObjectId
 from bson import ObjectId
 
@@ -16,9 +21,9 @@ from app.models.bills import Bills, BillItem, UserShare, BillSplitType, ItemSpli
 from app.models.events import Events
 from app.utils.auth import get_current_user
 
+load_dotenv()
 
 router = APIRouter(prefix="/bills", tags=["Bills"])
-
 
 def _parse_object_id(id_str: str) -> PydanticObjectId:
     if not ObjectId.is_valid(id_str):
@@ -30,12 +35,9 @@ def _generate_item_id() -> str:
     """Generate unique item ID"""
     return f"item_{uuid.uuid4().hex[:8]}"
 
-
 def _calculate_subtotal(items: list) -> float:
     """Calculate subtotal from items (quantity * unit_price)"""
     return sum(item.get("quantity", 1) * item.get("unit_price", 0) for item in items)
-
-
 
 def _calculate_total_amount(subtotal: float, tax: float) -> float:
     """Calculate total amount after tax"""
@@ -45,7 +47,6 @@ def _calculate_total_amount(subtotal: float, tax: float) -> float:
 def _round_share(amount: float) -> float:
     """Round share to 2 decimal places"""
     return round(amount, 2)
-
 
 def _bill_to_out(bill: Bills) -> BillOut:
     """Convert Bills model to BillOut DTO"""
@@ -210,7 +211,8 @@ def _process_manual(payload: BillCreateIn) -> tuple[float, float, list[BillItem]
     
     return subtotal, _round_share(total_amount), bill_items, per_user_shares
 
-
+def _encode_bytes_to_base64(file_bytes):
+    return base64.b64encode(file_bytes).decode('utf-8')
 
 @router.post(
     "/",
@@ -346,8 +348,6 @@ async def create_bill(payload: BillCreateIn, current_user: str = Depends(get_cur
     except Exception as e:
         raise e
 
-
-
 @router.get(
     "/",
     response_model=ReponseWrapper[list[BillOut]],
@@ -365,6 +365,39 @@ async def list_bills(event_id: str, current_user: str = Depends(get_current_user
     except Exception as e:
         raise e
 
+@router.post("/uploads")
+async def upload_image(file: UploadFile = File(...)):
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    client = OpenAI(api_key = os.getenv("OPENAI_API_KEY"))
+ 
+    file_bytes = await file.read()
+    base_64_image = _encode_bytes_to_base64(file_bytes)
+    response = client.beta.chat.completions.parse(
+        model="gpt-5-mini",
+        messages=[
+            {
+                "role": "system", 
+                "content": "Bạn là chuyên gia OCR hóa đơn."
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Trích xuất thông tin hóa đơn này."},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base_64_image}"},
+                    },
+                ],
+            }
+        ],
+        response_format=BillItemOut,
+    )
+    
+    return response.choices[0].message.parsed
+    
+    
 
 @router.get(
     "/{bill_id}",
