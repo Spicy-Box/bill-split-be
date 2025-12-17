@@ -224,8 +224,8 @@ class BillUpdateIn(BaseModel):
 
 class BalanceItemOut(BaseModel):
     """Single balance item - who owes whom"""
-    debtor: str = Field(..., description="User name who owes money")
-    creditor: str = Field(..., description="User name who is owed money")
+    debtor: Participants = Field(..., description="Participant who owes money")
+    creditor: Participants = Field(..., description="Participant who is owed money")
     amount_owed: float = Field(..., ge=0, serialization_alias="amountOwed", description="Amount owed")
 
     class Config:
@@ -246,19 +246,17 @@ class BillBalancesOut(BaseModel):
                 "totalAmount": 924000,
                 "balances": [
                     {
-                        "debtor": "Hùng",
-                        "creditor": "Minh",
+                        "debtor": {
+                            "name": "Hùng",
+                            "user_id": None,
+                            "is_guest": True
+                        },
+                        "creditor": {
+                            "name": "Minh",
+                            "user_id": None,
+                            "is_guest": True
+                        },
                         "amountOwed": 214500
-                    },
-                    {
-                        "debtor": "Lan",
-                        "creditor": "Minh",
-                        "amountOwed": 412500
-                    },
-                    {
-                        "debtor": "Mai",
-                        "creditor": "Minh",
-                        "amountOwed": 82500
                     }
                 ]
             }

@@ -537,7 +537,6 @@ async def get_bill_balances(bill_id: str, current_user: str = Depends(get_curren
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found")
 
         creditor_participant = bill.paid_by
-        creditor_name = creditor_participant.name
 
         balances = []
         for share in bill.per_user_shares:
@@ -557,11 +556,13 @@ async def get_bill_balances(bill_id: str, current_user: str = Depends(get_curren
             if same_person:
                 continue
             
-            balances.append(BalanceItemOut(
-                debtor=debtor_participant.name,
-                creditor=creditor_name,
-                amount_owed=_round_share(share.share)
-            ))
+            balances.append(
+                BalanceItemOut(
+                    debtor=debtor_participant,
+                    creditor=creditor_participant,
+                    amount_owed=_round_share(share.share),
+                )
+            )
         
         result = BillBalancesOut(
             bill_id=str(bill.id),
