@@ -158,7 +158,8 @@ class BillOut(BaseModel):
     subtotal: float
     tax: float
     total_amount: float = Field(..., serialization_alias="totalAmount")
-    paid_by: str = Field(..., serialization_alias="paidBy")
+    # Return full participant info for the payer
+    paid_by: Participants = Field(..., serialization_alias="paidBy")
     per_user_shares: List[UserShareOut] = Field(..., serialization_alias="perUserShares")
 
     class Config:

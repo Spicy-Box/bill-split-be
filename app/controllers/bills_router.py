@@ -98,7 +98,9 @@ def _process_by_item(payload: BillCreateIn) -> tuple[float, float, list[BillItem
 
     total_amount = _calculate_total_amount(subtotal, payload.tax)
 
+    # key: stable participant identifier (user_id or name)
     user_shares: Dict[str, float] = defaultdict(float)
+    participants_map: Dict[str, Participants] = {}
     tax_multiplier = 1 + payload.tax / 100
     
     bill_items = []
@@ -130,7 +132,9 @@ def _process_by_item(payload: BillCreateIn) -> tuple[float, float, list[BillItem
 
         share_per_person = total_price / len(participants_list)
         for participant in participants_list:
-            user_shares[participant.name] += share_per_person
+            key = str(participant.user_id) if participant.user_id is not None else participant.name
+            participants_map[key] = participant
+            user_shares[key] += share_per_person
 
         bill_items.append(BillItem(
             id=_generate_item_id(),
@@ -144,10 +148,10 @@ def _process_by_item(payload: BillCreateIn) -> tuple[float, float, list[BillItem
 
     per_user_shares = [
         UserShare(
-            user_name=Participants(name=user_name),
+            user_name=participants_map[key],
             share=_round_share(share * tax_multiplier),
         )
-        for user_name, share in user_shares.items()
+        for key, share in user_shares.items()
     ]
     return subtotal, _round_share(total_amount), bill_items, per_user_shares
 
@@ -349,6 +353,21 @@ async def create_bill(payload: BillCreateIn, current_user: str = Depends(get_cur
         event = await _validate_event(payload.event_id)
         owner_id = _parse_object_id(current_user)
 
+        # Map paid_by (string from client) to Participants from event, keeping user_id
+        paid_by_participant: Participants | None = None
+        if event.participants:
+            for p in event.participants:
+                # Match by user_id (as string) or by name
+                if (
+                    (p.user_id is not None and str(p.user_id) == payload.paid_by)
+                    or p.name == payload.paid_by
+                ):
+                    paid_by_participant = p
+                    break
+        if paid_by_participant is None:
+            # Fallback: create guest participant if not found in event
+            paid_by_participant = Participants(name=payload.paid_by, is_guest=True)
+
         if payload.bill_split_type == BillSplitType.BY_ITEM:
             subtotal, total_amount, bill_items, per_user_shares = _process_by_item(payload)
         elif payload.bill_split_type == BillSplitType.EQUALLY:
@@ -371,7 +390,7 @@ async def create_bill(payload: BillCreateIn, current_user: str = Depends(get_cur
             subtotal=subtotal,
             tax=payload.tax,
             total_amount=total_amount,
-            paid_by=payload.paid_by,
+            paid_by=paid_by_participant,
             per_user_shares=per_user_shares
         )
         await new_bill.insert()
@@ -519,16 +538,30 @@ async def get_bill_balances(bill_id: str, current_user: str = Depends(get_curren
         if not bill:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found")
 
-        creditor = bill.paid_by
+        creditor_participant = bill.paid_by
+        creditor_name = creditor_participant.name
 
         balances = []
         for share in bill.per_user_shares:
-            if share.user_name == creditor:
+            debtor_participant = share.user_name
+
+            # Bỏ qua nếu debtor chính là creditor (so sánh theo user_id nếu có, fallback name)
+            same_person = False
+            if (
+                debtor_participant.user_id is not None
+                and creditor_participant.user_id is not None
+                and debtor_participant.user_id == creditor_participant.user_id
+            ):
+                same_person = True
+            elif debtor_participant.user_id is None and creditor_participant.user_id is None:
+                same_person = debtor_participant.name == creditor_participant.name
+
+            if same_person:
                 continue
             
             balances.append(BalanceItemOut(
-                debtor=share.user_name,
-                creditor=creditor,
+                debtor=debtor_participant.name,
+                creditor=creditor_name,
                 amount_owed=_round_share(share.share)
             ))
         
