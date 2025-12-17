@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from datetime import datetime, timezone
 from bson import ObjectId
 
-from app.models.events import Events
+from app.models.events import Events, Participants
 from app.models.users import User
 from app.models.bills import Bills
 from app.dto.events import EventIn, EventOut, EventsOut, EventDetailOut, EventUpdate
@@ -17,6 +17,11 @@ router = APIRouter(prefix='/events', tags=["Events"])
 async def create_event(event_in: EventIn, current_user: str = Depends(get_current_user)):
     try:
         user = await User.get(current_user)
+        
+        participants: List[Participants] = list(map(lambda name: Participants(name=name, is_guest=True), event_in.participants))
+        participants = [Participants(name=user.first_name +  " " + user.last_name, user_id=user.id, is_guest=False)] + participants
+        
+        event_in.participants = participants
         
         # event_in.participants.append(user.first_name)
         event = Events(
