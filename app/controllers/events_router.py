@@ -18,7 +18,7 @@ async def create_event(event_in: EventIn, current_user: str = Depends(get_curren
     try:
         user = await User.get(current_user)
         
-        event_in.participants.append(user.first_name)
+        # event_in.participants.append(user.first_name)
         event = Events(
             **event_in.model_dump(),
             creator=user.id,    

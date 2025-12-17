@@ -32,6 +32,7 @@ class EventsOut(BaseModel):
 class EventDetailOut(BaseModel):
     id: PydanticObjectId = Field(..., description="Event ID", examples=["60f5f8a3b9c3f0a1b2c3d4e0"])
     name: str = Field(..., description="Name of the event", examples=["Birthday Party"])
+    creator: PydanticObjectId = Field(..., description="Creator of the events", examples=["60f5f8a3b9c3f0a1b2c3d4e0"])
     currency: CurrencyEnum = Field(..., description="Currency type for the event", examples=[1])
     createdAt: datetime = Field(..., description="Event creation time", examples=["2024-10-01T12:00:00Z"])
     participants: List[str] = Field(..., description="List of participant name", examples=[["Alice", "Bob", "Charlie"]])
