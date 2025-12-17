@@ -3,7 +3,8 @@ from typing import List, Optional
 
 from beanie import PydanticObjectId
 from pydantic import BaseModel, Field
-from app.models.events import CurrencyEnum, Participants
+from app.dto.base import Participants
+from app.models.events import CurrencyEnum
 from app.models.bills import Bills
 
 class EventIn(BaseModel):

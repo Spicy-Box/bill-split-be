@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from beanie import PydanticObjectId
 from bson import ObjectId
 
-from app.dto.base import ReponseWrapper
+from app.dto.base import ReponseWrapper, Participants
 from app.dto.bills import (
     BillCreateIn, BillOut, BillItemOut, UserShareOut, BillUpdateIn,
     BillBalancesOut, BalanceItemOut
@@ -116,10 +116,21 @@ def _process_by_item(payload: BillCreateIn) -> tuple[float, float, list[BillItem
         quantity = item.get("quantity", 1)
         unit_price = item.get("unit_price", 0)
         total_price = quantity * unit_price
-        split_between = item["split_between"]
-        share_per_person = total_price / len(split_between)
-        for user_name in split_between:
-            user_shares[user_name] += share_per_person
+
+        # Chuẩn hoá split_between về list[Participants]
+        raw_split_between = item["split_between"]
+        participants_list: list[Participants] = []
+        for p in raw_split_between:
+            if isinstance(p, Participants):
+                participants_list.append(p)
+            elif isinstance(p, dict):
+                participants_list.append(Participants(**p))
+            else:
+                participants_list.append(Participants(name=str(p)))
+
+        share_per_person = total_price / len(participants_list)
+        for participant in participants_list:
+            user_shares[participant.name] += share_per_person
 
         bill_items.append(BillItem(
             id=_generate_item_id(),
@@ -128,11 +139,14 @@ def _process_by_item(payload: BillCreateIn) -> tuple[float, float, list[BillItem
             unit_price=unit_price,
             total_price=_round_share(total_price),
             split_type=ItemSplitType(item["split_type"]),
-            split_between=split_between
+            split_between=participants_list
         ))
 
     per_user_shares = [
-        UserShare(user_name=user_name, share=_round_share(share * tax_multiplier))
+        UserShare(
+            user_name=Participants(name=user_name),
+            share=_round_share(share * tax_multiplier),
+        )
         for user_name, share in user_shares.items()
     ]
     return subtotal, _round_share(total_amount), bill_items, per_user_shares
@@ -152,7 +166,12 @@ async def _process_equally(payload: BillCreateIn, event: Events) -> tuple[float,
 
     share_per_person = total_amount / len(event.participants)
     per_user_shares = [
-        UserShare(user_name=str(participant), share=_round_share(share_per_person))
+        UserShare(
+            user_name=participant
+            if isinstance(participant, Participants)
+            else Participants(name=str(participant)),
+            share=_round_share(share_per_person),
+        )
         for participant in event.participants
     ]
 
@@ -192,7 +211,12 @@ def _process_manual(payload: BillCreateIn) -> tuple[float, float, list[BillItem]
         )
 
     per_user_shares = [
-        UserShare(user_name=share.user_name, share=_round_share(share.amount))
+        UserShare(
+            user_name=Participants(name=share.user_name)
+            if not isinstance(share.user_name, Participants)
+            else share.user_name,
+            share=_round_share(share.amount),
+        )
         for share in payload.manual_shares
     ]
 
@@ -226,7 +250,7 @@ def _encode_bytes_to_base64(file_bytes):
                     "examples": {
                         "split_by_item": {
                             "summary": "Split by item",
-                            "description": "Each item is split between specific users",
+                            "description": "Each item is split between specific users (Participants objects)",
                             "value": {
                                 "event_id": "69383ff5d1b5eaf8f4a83136",
                                 "title": "Nhậu quán A",
@@ -238,21 +262,31 @@ def _encode_bytes_to_base64(file_bytes):
                                         "quantity": 1,
                                         "unit_price": 300000,
                                         "split_type": "everyone",
-                                        "split_between": ["Minh", "Hùng", "Lan", "Mai"]
+                                        "split_between": [
+                                            {"name": "Minh", "user_id": None, "is_guest": True},
+                                            {"name": "Hùng", "user_id": None, "is_guest": True},
+                                            {"name": "Lan", "user_id": None, "is_guest": True},
+                                            {"name": "Mai", "user_id": None, "is_guest": True}
+                                        ]
                                     },
                                     {
                                         "name": "Cánh gà chiên",
                                         "quantity": 2,
                                         "unit_price": 120000,
                                         "split_type": "custom",
-                                        "split_between": ["Minh", "Hùng"]
+                                        "split_between": [
+                                            {"name": "Minh", "user_id": None, "is_guest": True},
+                                            {"name": "Hùng", "user_id": None, "is_guest": True}
+                                        ]
                                     },
                                     {
                                         "name": "Mì bò",
                                         "quantity": 3,
                                         "unit_price": 100000,
                                         "split_type": "custom",
-                                        "split_between": ["Lan"]
+                                        "split_between": [
+                                            {"name": "Lan", "user_id": None, "is_guest": True}
+                                        ]
                                     }
                                 ],
                                 "tax": 10,

@@ -6,6 +6,8 @@ from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 from pymongo import IndexModel
 
+from app.dto.base import Participants
+
 
 class BillSplitType(str, Enum):
     BY_ITEM = "by_item"
@@ -26,12 +28,16 @@ class BillItem(BaseModel):
     unit_price: float = Field(..., ge=0)
     total_price: float = Field(..., ge=0)
     split_type: Optional[ItemSplitType] = Field(default=None, description="Split type for by_item mode")
-    split_between: Optional[List[str]] = Field(default=None, description="User names who share this item")
+    # Store full participant info instead of just names
+    split_between: Optional[List[Participants]] = Field(
+        default=None,
+        description="Participants who share this item",
+    )
 
 
 class UserShare(BaseModel):
     """Embedded model for user shares"""
-    user_name: str = Field(..., description="User name")
+    user_name: Participants = Field(..., description="User name")
     share: float = Field(..., ge=0, description="Amount user needs to pay")
 
 

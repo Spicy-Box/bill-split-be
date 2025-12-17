@@ -5,18 +5,13 @@ from enum import IntEnum
 from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 from pymongo import IndexModel
+from app.dto.base import Participants
 from app.models.bills import Bills
 
 class CurrencyEnum(IntEnum):
     VND = 1
     USD = 2
     JPY = 3
-    
-    
-class Participants(BaseModel):
-    name: str
-    user_id: Optional[PydanticObjectId] = None
-    is_guest: bool = True
 
 class Events(Document):
     name: str = Field(..., description="Name of the event")
