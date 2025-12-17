@@ -5,8 +5,8 @@ from app.dto.base import Participants
 from app.models.bills import BillSplitType, ItemSplitType
 
 class ManualShareIn(BaseModel):
-    """Manual share input"""
-    user_name: str = Field(..., examples=["Minh"])
+    """Manual share input - user_name is full Participants object"""
+    user_name: Participants = Field(..., description="Full participant info")
     amount: float = Field(..., ge=0, examples=[10.0])
 
 

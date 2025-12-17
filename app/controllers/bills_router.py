@@ -216,9 +216,7 @@ def _process_manual(payload: BillCreateIn) -> tuple[float, float, list[BillItem]
 
     per_user_shares = [
         UserShare(
-            user_name=Participants(name=share.user_name)
-            if not isinstance(share.user_name, Participants)
-            else share.user_name,
+            user_name=share.user_name,
             share=_round_share(share.amount),
         )
         for share in payload.manual_shares
