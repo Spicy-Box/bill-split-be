@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from datetime import datetime, timezone
 from bson import ObjectId
 
-from app.models.events import Events
+from app.models.events import Events, Participants
 from app.models.users import User
 from app.models.bills import Bills
 from app.dto.events import EventIn, EventOut, EventsOut, EventDetailOut, EventUpdate
@@ -18,9 +18,15 @@ async def create_event(event_in: EventIn, current_user: str = Depends(get_curren
     try:
         user = await User.get(current_user)
         
-        event_in.participants.append(user.first_name)
+        participants: List[Participants] = list(map(lambda name: Participants(name=name, is_guest=True), event_in.participants))
+        participants = [Participants(name=user.first_name +  " " + user.last_name, user_id=user.id, is_guest=False)] + participants
+        
+        event_in.participants = participants
+        
+        # event_in.participants.append(user.first_name)
         event = Events(
             **event_in.model_dump(),
+            creator=user.id,    
             total_amount=0.0,
             created_at=datetime.now(timezone.utc)
         )
@@ -41,7 +47,9 @@ async def create_event(event_in: EventIn, current_user: str = Depends(get_curren
 @router.get("/", response_model=ReponseWrapper[List[EventsOut]], status_code=status.HTTP_200_OK)
 async def find_events(current_user: str = Depends(get_current_user)):
     try:
-        list_events = await Events.find_all().to_list()
+        user = await User.get(current_user)
+        
+        list_events = await Events.find({"creator": user.id}).to_list()
         result = [EventsOut(
             **e.model_dump(),
             participantsCount= len(e.participants),
