@@ -1,13 +1,18 @@
 from datetime import datetime, timezone
+import os
 from typing import Dict
 from collections import defaultdict
 import uuid
+import base64
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from dotenv import load_dotenv
+from fastapi.security import api_key
+from openai import OpenAI
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from beanie import PydanticObjectId
 from bson import ObjectId
 
-from app.dto.base import ReponseWrapper
+from app.dto.base import ReponseWrapper, Participants
 from app.dto.bills import (
     BillCreateIn, BillOut, BillItemOut, UserShareOut, BillUpdateIn,
     BillBalancesOut, BalanceItemOut
@@ -16,9 +21,9 @@ from app.models.bills import Bills, BillItem, UserShare, BillSplitType, ItemSpli
 from app.models.events import Events
 from app.utils.auth import get_current_user
 
+load_dotenv()
 
 router = APIRouter(prefix="/bills", tags=["Bills"])
-
 
 def _parse_object_id(id_str: str) -> PydanticObjectId:
     if not ObjectId.is_valid(id_str):
@@ -30,12 +35,9 @@ def _generate_item_id() -> str:
     """Generate unique item ID"""
     return f"item_{uuid.uuid4().hex[:8]}"
 
-
 def _calculate_subtotal(items: list) -> float:
     """Calculate subtotal from items (quantity * unit_price)"""
     return sum(item.get("quantity", 1) * item.get("unit_price", 0) for item in items)
-
-
 
 def _calculate_total_amount(subtotal: float, tax: float) -> float:
     """Calculate total amount after tax"""
@@ -45,7 +47,6 @@ def _calculate_total_amount(subtotal: float, tax: float) -> float:
 def _round_share(amount: float) -> float:
     """Round share to 2 decimal places"""
     return round(amount, 2)
-
 
 def _bill_to_out(bill: Bills) -> BillOut:
     """Convert Bills model to BillOut DTO"""
@@ -97,7 +98,9 @@ def _process_by_item(payload: BillCreateIn) -> tuple[float, float, list[BillItem
 
     total_amount = _calculate_total_amount(subtotal, payload.tax)
 
+    # key: stable participant identifier (user_id or name)
     user_shares: Dict[str, float] = defaultdict(float)
+    participants_map: Dict[str, Participants] = {}
     tax_multiplier = 1 + payload.tax / 100
     
     bill_items = []
@@ -115,10 +118,23 @@ def _process_by_item(payload: BillCreateIn) -> tuple[float, float, list[BillItem
         quantity = item.get("quantity", 1)
         unit_price = item.get("unit_price", 0)
         total_price = quantity * unit_price
-        split_between = item["split_between"]
-        share_per_person = total_price / len(split_between)
-        for user_name in split_between:
-            user_shares[user_name] += share_per_person
+
+        # Chuẩn hoá split_between về list[Participants]
+        raw_split_between = item["split_between"]
+        participants_list: list[Participants] = []
+        for p in raw_split_between:
+            if isinstance(p, Participants):
+                participants_list.append(p)
+            elif isinstance(p, dict):
+                participants_list.append(Participants(**p))
+            else:
+                participants_list.append(Participants(name=str(p)))
+
+        share_per_person = total_price / len(participants_list)
+        for participant in participants_list:
+            key = str(participant.user_id) if participant.user_id is not None else participant.name
+            participants_map[key] = participant
+            user_shares[key] += share_per_person
 
         bill_items.append(BillItem(
             id=_generate_item_id(),
@@ -127,12 +143,15 @@ def _process_by_item(payload: BillCreateIn) -> tuple[float, float, list[BillItem
             unit_price=unit_price,
             total_price=_round_share(total_price),
             split_type=ItemSplitType(item["split_type"]),
-            split_between=split_between
+            split_between=participants_list
         ))
 
     per_user_shares = [
-        UserShare(user_name=user_name, share=_round_share(share * tax_multiplier))
-        for user_name, share in user_shares.items()
+        UserShare(
+            user_name=participants_map[key],
+            share=_round_share(share * tax_multiplier),
+        )
+        for key, share in user_shares.items()
     ]
     return subtotal, _round_share(total_amount), bill_items, per_user_shares
 
@@ -151,7 +170,12 @@ async def _process_equally(payload: BillCreateIn, event: Events) -> tuple[float,
 
     share_per_person = total_amount / len(event.participants)
     per_user_shares = [
-        UserShare(user_name=str(participant), share=_round_share(share_per_person))
+        UserShare(
+            user_name=participant
+            if isinstance(participant, Participants)
+            else Participants(name=str(participant)),
+            share=_round_share(share_per_person),
+        )
         for participant in event.participants
     ]
 
@@ -191,7 +215,10 @@ def _process_manual(payload: BillCreateIn) -> tuple[float, float, list[BillItem]
         )
 
     per_user_shares = [
-        UserShare(user_name=share.user_name, share=_round_share(share.amount))
+        UserShare(
+            user_name=share.user_name,
+            share=_round_share(share.amount),
+        )
         for share in payload.manual_shares
     ]
 
@@ -210,7 +237,8 @@ def _process_manual(payload: BillCreateIn) -> tuple[float, float, list[BillItem]
     
     return subtotal, _round_share(total_amount), bill_items, per_user_shares
 
-
+def _encode_bytes_to_base64(file_bytes):
+    return base64.b64encode(file_bytes).decode('utf-8')
 
 @router.post(
     "/",
@@ -224,7 +252,7 @@ def _process_manual(payload: BillCreateIn) -> tuple[float, float, list[BillItem]
                     "examples": {
                         "split_by_item": {
                             "summary": "Split by item",
-                            "description": "Each item is split between specific users",
+                            "description": "Each item is split between specific users (Participants objects)",
                             "value": {
                                 "event_id": "69383ff5d1b5eaf8f4a83136",
                                 "title": "Nhậu quán A",
@@ -236,21 +264,31 @@ def _process_manual(payload: BillCreateIn) -> tuple[float, float, list[BillItem]
                                         "quantity": 1,
                                         "unit_price": 300000,
                                         "split_type": "everyone",
-                                        "split_between": ["Minh", "Hùng", "Lan", "Mai"]
+                                        "split_between": [
+                                            {"name": "Minh", "user_id": None, "is_guest": True},
+                                            {"name": "Hùng", "user_id": None, "is_guest": True},
+                                            {"name": "Lan", "user_id": None, "is_guest": True},
+                                            {"name": "Mai", "user_id": None, "is_guest": True}
+                                        ]
                                     },
                                     {
                                         "name": "Cánh gà chiên",
                                         "quantity": 2,
                                         "unit_price": 120000,
                                         "split_type": "custom",
-                                        "split_between": ["Minh", "Hùng"]
+                                        "split_between": [
+                                            {"name": "Minh", "user_id": None, "is_guest": True},
+                                            {"name": "Hùng", "user_id": None, "is_guest": True}
+                                        ]
                                     },
                                     {
                                         "name": "Mì bò",
                                         "quantity": 3,
                                         "unit_price": 100000,
                                         "split_type": "custom",
-                                        "split_between": ["Lan"]
+                                        "split_between": [
+                                            {"name": "Lan", "user_id": None, "is_guest": True}
+                                        ]
                                     }
                                 ],
                                 "tax": 10,
@@ -313,6 +351,21 @@ async def create_bill(payload: BillCreateIn, current_user: str = Depends(get_cur
         event = await _validate_event(payload.event_id)
         owner_id = _parse_object_id(current_user)
 
+        # Map paid_by (string from client) to Participants from event, keeping user_id
+        paid_by_participant: Participants | None = None
+        if event.participants:
+            for p in event.participants:
+                # Match by user_id (as string) or by name
+                if (
+                    (p.user_id is not None and str(p.user_id) == payload.paid_by)
+                    or p.name == payload.paid_by
+                ):
+                    paid_by_participant = p
+                    break
+        if paid_by_participant is None:
+            # Fallback: create guest participant if not found in event
+            paid_by_participant = Participants(name=payload.paid_by, is_guest=True)
+
         if payload.bill_split_type == BillSplitType.BY_ITEM:
             subtotal, total_amount, bill_items, per_user_shares = _process_by_item(payload)
         elif payload.bill_split_type == BillSplitType.EQUALLY:
@@ -335,7 +388,7 @@ async def create_bill(payload: BillCreateIn, current_user: str = Depends(get_cur
             subtotal=subtotal,
             tax=payload.tax,
             total_amount=total_amount,
-            paid_by=payload.paid_by,
+            paid_by=paid_by_participant,
             per_user_shares=per_user_shares
         )
         await new_bill.insert()
@@ -345,8 +398,6 @@ async def create_bill(payload: BillCreateIn, current_user: str = Depends(get_cur
         raise
     except Exception as e:
         raise e
-
-
 
 @router.get(
     "/",
@@ -365,6 +416,39 @@ async def list_bills(event_id: str, current_user: str = Depends(get_current_user
     except Exception as e:
         raise e
 
+@router.post("/uploads")
+async def upload_image(file: UploadFile = File(...)):
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    client = OpenAI(api_key = os.getenv("OPENAI_API_KEY"))
+ 
+    file_bytes = await file.read()
+    base_64_image = _encode_bytes_to_base64(file_bytes)
+    response = client.beta.chat.completions.parse(
+        model="gpt-5-mini",
+        messages=[
+            {
+                "role": "system", 
+                "content": "Bạn là chuyên gia OCR hóa đơn."
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Trích xuất thông tin hóa đơn này."},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base_64_image}"},
+                    },
+                ],
+            }
+        ],
+        response_format=BillItemOut,
+    )
+    
+    return response.choices[0].message.parsed
+    
+    
 
 @router.get(
     "/{bill_id}",
@@ -452,18 +536,33 @@ async def get_bill_balances(bill_id: str, current_user: str = Depends(get_curren
         if not bill:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found")
 
-        creditor = bill.paid_by
+        creditor_participant = bill.paid_by
 
         balances = []
         for share in bill.per_user_shares:
-            if share.user_name == creditor:
+            debtor_participant = share.user_name
+
+            # Bỏ qua nếu debtor chính là creditor (so sánh theo user_id nếu có, fallback name)
+            same_person = False
+            if (
+                debtor_participant.user_id is not None
+                and creditor_participant.user_id is not None
+                and debtor_participant.user_id == creditor_participant.user_id
+            ):
+                same_person = True
+            elif debtor_participant.user_id is None and creditor_participant.user_id is None:
+                same_person = debtor_participant.name == creditor_participant.name
+
+            if same_person:
                 continue
             
-            balances.append(BalanceItemOut(
-                debtor=share.user_name,
-                creditor=creditor,
-                amount_owed=_round_share(share.share)
-            ))
+            balances.append(
+                BalanceItemOut(
+                    debtor=debtor_participant,
+                    creditor=creditor_participant,
+                    amount_owed=_round_share(share.share),
+                )
+            )
         
         result = BillBalancesOut(
             bill_id=str(bill.id),

@@ -6,6 +6,8 @@ from beanie import Document, PydanticObjectId
 from pydantic import BaseModel, Field
 from pymongo import IndexModel
 
+from app.dto.base import Participants
+
 
 class BillSplitType(str, Enum):
     BY_ITEM = "by_item"
@@ -26,12 +28,16 @@ class BillItem(BaseModel):
     unit_price: float = Field(..., ge=0)
     total_price: float = Field(..., ge=0)
     split_type: Optional[ItemSplitType] = Field(default=None, description="Split type for by_item mode")
-    split_between: Optional[List[str]] = Field(default=None, description="User names who share this item")
+    # Store full participant info instead of just names
+    split_between: Optional[List[Participants]] = Field(
+        default=None,
+        description="Participants who share this item",
+    )
 
 
 class UserShare(BaseModel):
     """Embedded model for user shares"""
-    user_name: str = Field(..., description="User name")
+    user_name: Participants = Field(..., description="User name")
     share: float = Field(..., ge=0, description="Amount user needs to pay")
 
 
@@ -45,8 +51,12 @@ class Bills(Document):
     subtotal: float = Field(..., ge=0, description="Total before tax")
     tax: float = Field(default=0, ge=0, description="Tax percentage")
     total_amount: float = Field(..., ge=0, description="Total after tax")
-    paid_by: str = Field(..., description="User name who paid the bill")
-    per_user_shares: List[UserShare] = Field(default_factory=list, description="Amount each user needs to pay")
+    # Store full participant info for the payer
+    paid_by: Participants = Field(..., description="Participant who paid the bill")
+    per_user_shares: List[UserShare] = Field(
+        default_factory=list,
+        description="Amount each user needs to pay",
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

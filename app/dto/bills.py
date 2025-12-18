@@ -1,11 +1,12 @@
 from typing import List, Optional, Union, Annotated
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.dto.base import Participants
 from app.models.bills import BillSplitType, ItemSplitType
 
 class ManualShareIn(BaseModel):
-    """Manual share input"""
-    user_name: str = Field(..., examples=["Minh"])
+    """Manual share input - user_name is full Participants object"""
+    user_name: Participants = Field(..., description="Full participant info")
     amount: float = Field(..., ge=0, examples=[10.0])
 
 
@@ -37,21 +38,31 @@ class BillCreateIn(BaseModel):
                                 "quantity": 1,
                                 "unit_price": 300000,
                                 "split_type": "everyone",
-                                "split_between": ["Minh", "Hùng", "Lan", "Mai"]
+                                "split_between": [
+                                    {"name": "Minh", "user_id": None, "is_guest": True},
+                                    {"name": "Hùng", "user_id": None, "is_guest": True},
+                                    {"name": "Lan", "user_id": None, "is_guest": True},
+                                    {"name": "Mai", "user_id": None, "is_guest": True}
+                                ]
                             },
                             {
                                 "name": "Cánh gà chiên",
                                 "quantity": 2,
                                 "unit_price": 120000,
                                 "split_type": "custom",
-                                "split_between": ["Minh", "Hùng"]
+                                "split_between": [
+                                    {"name": "Minh", "user_id": None, "is_guest": True},
+                                    {"name": "Hùng", "user_id": None, "is_guest": True}
+                                ]
                             },
                             {
                                 "name": "Mì bò",
                                 "quantity": 3,
                                 "unit_price": 100000,
                                 "split_type": "custom",
-                                "split_between": ["Lan"]
+                                "split_between": [
+                                    {"name": "Lan", "user_id": None, "is_guest": True}
+                                ]
                             }
                         ],
                         "tax": 10,
@@ -116,7 +127,11 @@ class BillItemOut(BaseModel):
     unit_price: float = Field(..., serialization_alias="unitPrice")
     total_price: float = Field(..., serialization_alias="totalPrice")
     split_type: Optional[ItemSplitType] = Field(default=None, serialization_alias="splitType")
-    split_between: Optional[List[str]] = Field(default=None, serialization_alias="splitBetween")
+    # Trả ra đầy đủ thông tin người tham gia cho từng item
+    split_between: Optional[List[Participants]] = Field(
+        default=None,
+        serialization_alias="splitBetween",
+    )
 
     class Config:
         populate_by_name = True
@@ -124,7 +139,7 @@ class BillItemOut(BaseModel):
 
 class UserShareOut(BaseModel):
     """User share output"""
-    user_name: str = Field(..., serialization_alias="userName")
+    user_name: Participants = Field(..., serialization_alias="userName")
     share: float
 
     class Config:
@@ -143,7 +158,8 @@ class BillOut(BaseModel):
     subtotal: float
     tax: float
     total_amount: float = Field(..., serialization_alias="totalAmount")
-    paid_by: str = Field(..., serialization_alias="paidBy")
+    # Return full participant info for the payer
+    paid_by: Participants = Field(..., serialization_alias="paidBy")
     per_user_shares: List[UserShareOut] = Field(..., serialization_alias="perUserShares")
 
     class Config:
@@ -208,8 +224,8 @@ class BillUpdateIn(BaseModel):
 
 class BalanceItemOut(BaseModel):
     """Single balance item - who owes whom"""
-    debtor: str = Field(..., description="User name who owes money")
-    creditor: str = Field(..., description="User name who is owed money")
+    debtor: Participants = Field(..., description="Participant who owes money")
+    creditor: Participants = Field(..., description="Participant who is owed money")
     amount_owed: float = Field(..., ge=0, serialization_alias="amountOwed", description="Amount owed")
 
     class Config:
@@ -230,19 +246,17 @@ class BillBalancesOut(BaseModel):
                 "totalAmount": 924000,
                 "balances": [
                     {
-                        "debtor": "Hùng",
-                        "creditor": "Minh",
+                        "debtor": {
+                            "name": "Hùng",
+                            "user_id": None,
+                            "is_guest": True
+                        },
+                        "creditor": {
+                            "name": "Minh",
+                            "user_id": None,
+                            "is_guest": True
+                        },
                         "amountOwed": 214500
-                    },
-                    {
-                        "debtor": "Lan",
-                        "creditor": "Minh",
-                        "amountOwed": 412500
-                    },
-                    {
-                        "debtor": "Mai",
-                        "creditor": "Minh",
-                        "amountOwed": 82500
                     }
                 ]
             }

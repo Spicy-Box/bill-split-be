@@ -1,5 +1,5 @@
 from typing import Union
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
@@ -56,6 +56,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# @app.middleware("http")
+# async def log_request(request: Request, call_next):
+#     # chỉ nên log body với JSON nhỏ; tránh file upload
+#     body = await request.body()
+#     print("REQ", request.method, request.url)
+#     print("Headers:", dict(request.headers))
+#     print("Body:", body.decode(errors="ignore"))
+#     response = await call_next(request)
+#     print("RES", response.status_code)
+#     return response
 
 app.include_router(users_router.router)
 app.include_router(bills_router.router)

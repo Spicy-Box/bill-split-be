@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from dotenv.main import logger
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
@@ -70,8 +71,10 @@ async def verify_refresh_token(refresh_token: str):
         raise e
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
+    print(token if token is not None else "hello")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        print(payload)
         user_id = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid or expired access token. Please refresh token!!!")
