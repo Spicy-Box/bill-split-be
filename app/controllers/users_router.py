@@ -1,12 +1,18 @@
 from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from datetime import datetime
+from beanie import PydanticObjectId
 
 from app.dto.users import LoginResponse, UserIn, UserOut, LoginRequest, UserUpdate, ForgotPasswordRequest, ResetPasswordRequest, TokenResponse, VerifyOtpRequest, ChangePasswordRequest
 from app.models.users import User, OtpCode
+from app.models.bills import Bills
 from pwdlib import PasswordHash
 
 from app.dto.base import ReponseWrapper
+from app.dto.bills import BillOut, ListBillOut, BillItemOut, UserShareOut
+from app.models.events import Events
+from app.dto.events import EventsOut, ListEventsOut
+from app.models.bills import BillItem, UserShare
 from app.services.gmail import send_email_background
 
 from app.utils.auth import verify_password, create_access_token, create_refresh_token, hash_password, get_current_user, verify_refresh_token, revoke_refresh_token, revoke_all_user_tokens, generate_otp_secret
@@ -263,3 +269,96 @@ async def change_password(data: ChangePasswordRequest, current_user: str = Depen
 #   except Exception as e:
 #     raise e
 
+def map_bill_item(item: BillItem) -> BillItemOut:
+    return BillItemOut(
+        id=str(item.id),
+        name=item.name,
+        quantity=item.quantity,
+        unit_price=item.unit_price,
+        total_price=item.total_price,
+        split_type=item.split_type,
+        split_between=item.split_between,
+    )
+
+def map_user_share_to_out(user_share: UserShare) -> UserShareOut:
+    return UserShareOut(
+        user_name=user_share.user_name,
+        share=user_share.share,
+    )
+
+def map_bill_to_out(bill: Bills) -> BillOut:
+    return BillOut(
+        id=str(bill.id),
+        owner_id=str(bill.owner_id),
+        event_id=str(bill.event_id),
+        title=bill.title,
+        note=bill.note,
+        bill_split_type=bill.bill_split_type,
+        items=[map_bill_item(item) for item in bill.items],
+        subtotal=bill.subtotal,
+        tax=bill.tax,
+        total_amount=bill.total_amount,
+        paid_by=bill.paid_by,
+        per_user_shares=[
+            map_user_share_to_out(share)
+            for share in bill.per_user_shares
+        ],
+    )
+
+
+
+@router.get("/history/bills", response_model=ReponseWrapper[ListBillOut], status_code=status.HTTP_200_OK)
+async def get_bill_history(current_user: str = Depends(get_current_user)):
+    """
+    Get bill history for the current user.
+    """
+    try:
+        user = await User.get(current_user)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        # Fetch bill history from the database
+        bill_history = await Bills.find(Bills.owner_id == user.id).sort(-Bills.created_at).to_list()
+        result = [map_bill_to_out(bill) for bill in bill_history]
+        result = ListBillOut(bills=result)
+        return ReponseWrapper(message="Bill history retrieved successfully", data=result)
+    except Exception as e:
+        raise e
+    
+def map_event_to_out(event: Events) -> EventsOut:
+    return EventsOut(
+        id=event.id,                     # ← giữ nguyên
+        name=event.name,
+        creator=event.creator,           # ← giữ nguyên
+        currency=event.currency,
+        participantsCount=len(event.participants),
+        totalAmount=event.total_amount,
+        createdAt=event.created_at,
+    )
+
+    
+@router.get(
+    "/history/events",
+    response_model=ReponseWrapper[ListEventsOut],
+    status_code=status.HTTP_200_OK
+)
+async def get_event_history(
+    current_user: PydanticObjectId = Depends(get_current_user)
+):
+    user = await User.get(current_user)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    events = (
+        await Events
+        .find(Events.creator == user.id)
+        .sort(-Events.created_at)
+        .to_list()
+    )
+
+    result = [map_event_to_out(e) for e in events]
+
+    return ReponseWrapper(
+        message="Get all events successfully",
+        data=ListEventsOut(events=result)
+    )

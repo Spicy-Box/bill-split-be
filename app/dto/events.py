@@ -43,6 +43,9 @@ class EventsOut(BaseModel):
     totalAmount: float = Field(..., description="Total amount of money for the event", examples=[150.0])
     createdAt: datetime = Field(..., description="Event creation time", examples=["2024-10-01T12:00:00Z"])
 
+class ListEventsOut(BaseModel):
+    events: List[EventsOut] = Field(..., description="List of events")
+
 class EventDetailOut(BaseModel):
     id: PydanticObjectId = Field(..., description="Event ID", examples=["60f5f8a3b9c3f0a1b2c3d4e0"])
     name: str = Field(..., description="Name of the event", examples=["Birthday Party"])
