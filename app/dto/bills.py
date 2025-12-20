@@ -136,6 +136,10 @@ class BillItemOut(BaseModel):
     class Config:
         populate_by_name = True
 
+class ListBillItemOut(BaseModel):
+    """List of Bill Items output"""
+    items: List[BillItemOut]
+
 
 class UserShareOut(BaseModel):
     """User share output"""
@@ -261,3 +265,7 @@ class BillBalancesOut(BaseModel):
                 ]
             }
         }
+
+class ListBillOut(BaseModel):
+    """List of Bills output"""
+    bills: List[BillOut]

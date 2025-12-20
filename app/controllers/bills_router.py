@@ -15,7 +15,7 @@ from bson import ObjectId
 from app.dto.base import ReponseWrapper, Participants
 from app.dto.bills import (
     BillCreateIn, BillOut, BillItemOut, UserShareOut, BillUpdateIn,
-    BillBalancesOut, BalanceItemOut
+    BillBalancesOut, BalanceItemOut, ListBillItemOut
 )
 from app.models.bills import Bills, BillItem, UserShare, BillSplitType, ItemSplitType
 from app.models.events import Events
@@ -416,7 +416,7 @@ async def list_bills(event_id: str, current_user: str = Depends(get_current_user
     except Exception as e:
         raise e
 
-@router.post("/uploads")
+@router.post("/uploads", response_model=ListBillItemOut, status_code=status.HTTP_200_OK, description="Upload bill image for OCR processing")
 async def upload_image(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
@@ -430,7 +430,93 @@ async def upload_image(file: UploadFile = File(...)):
         messages=[
             {
                 "role": "system", 
-                "content": "Bạn là chuyên gia OCR hóa đơn."
+                "content": 
+                    """
+                            Bạn là hệ thống OCR chuyên trích xuất dữ liệu hóa đơn.
+                            ========================
+                            NGUYÊN TẮC CỐT LÕI
+                            ========================
+                            - KHÔNG suy luận
+                            - KHÔNG phân tích
+                            - KHÔNG phỏng đoán
+                            - KHÔNG giải thích
+                            - KHÔNG tự sửa dữ liệu nếu không có quy tắc bên dưới
+
+                            Chỉ thực hiện:
+                            - Đọc chính xác nội dung hiển thị trên hóa đơn
+                            - Chuẩn hóa dữ liệu theo quy tắc được mô tả
+                            - Trả về dữ liệu đúng định dạng JSON yêu cầu
+
+                            Nếu thông tin không rõ ràng hoặc không xuất hiện:
+                            - Trả về null
+                            - Tuyệt đối không tự đoán
+
+                            ========================
+                            PHÁT HIỆN NGÔN NGỮ & LOCALE
+                            ========================
+                            - Tự động xác định NGÔN NGỮ và QUỐC GIA của hóa đơn dựa trên:
+                            - Ngôn ngữ văn bản (Ví dụ: tiếng Việt, tiếng Anh)
+                            - Tên sản phẩm
+                            - Đơn vị tiền tệ (VND, USD, $, ₫)
+                            - Định dạng giá tiền
+
+                            ========================
+                            QUY TẮC XỬ LÝ TIỀN TỆ
+                            ========================
+
+                            --- HÓA ĐƠN VIỆT NAM (Tiếng Việt / VND) ---
+                            - Đơn vị tiền tệ: VND
+                            - VND KHÔNG có phần thập phân
+                            - Dấu "." là PHÂN CÁCH HÀNG NGHÌN
+                            - Dấu "," (nếu có) cũng là phân cách hàng nghìn
+                            - Khi trích xuất giá tiền:
+                            - LOẠI BỎ toàn bộ dấu "." và ","
+                            - Trả về SỐ NGUYÊN
+
+                            Ví dụ:
+                            - "23.674" → 23674
+                            - "69.000/KG" → 69000
+                            - "123.900" → 123900
+
+                            --- HÓA ĐƠN MỸ / QUỐC TẾ (Tiếng Anh / USD) ---
+                            - Đơn vị tiền tệ: USD
+                            - Dấu "," là PHÂN CÁCH HÀNG NGHÌN
+                            - Dấu "." là DẤU THẬP PHÂN
+                            - Giữ nguyên giá trị thập phân nếu có
+
+                            Ví dụ:
+                            - "1,234.56" → 1234.56
+                            - "5.99" → 5.99
+
+                            ========================
+                            QUY TẮC TÍNH TOÁN
+                            ========================
+                            - Nếu hóa đơn có dạng "X/KG x Y KG":
+                            - totalPrice = X * Y
+                            - unitPrice = totalPrice
+                            - Sau khi tính toán:
+                            - Làm tròn theo quy tắc của tiền tệ tương ứng
+                            - VND → số nguyên
+                            - USD → giữ tối đa 2 chữ số thập phân
+
+                            ========================
+                            KIỂM TRA LOGIC CƠ BẢN
+                            ========================
+                            - Nếu giá tiền quá nhỏ bất thường so với mặt hàng (ví dụ < 1000 VND cho thực phẩm):
+                            - Kiểm tra khả năng nhầm dấu phân cách
+                            - Áp dụng lại quy tắc tiền tệ theo locale
+
+                            ========================
+                            ĐỊNH DẠNG OUTPUT
+                            ========================
+                            - Chỉ trả về JSON hợp lệ
+                            - Không thêm text giải thích
+                            - Không thêm metadata
+                            - Không thêm nhận xét
+
+                            - JSON phải khớp chính xác với schema được cung cấp
+                            - Không trả về danh sách trần nếu schema yêu cầu object bọc ngoài
+                        """
             },
             {
                 "role": "user",
@@ -443,7 +529,7 @@ async def upload_image(file: UploadFile = File(...)):
                 ],
             }
         ],
-        response_format=BillItemOut,
+        response_format=ListBillItemOut,
     )
     
     return response.choices[0].message.parsed
