@@ -13,20 +13,23 @@ from app.utils.auth import get_current_user
 
 router = APIRouter(prefix='/events', tags=["Events"])
 
+
 @router.post("/", response_model=ReponseWrapper[EventOut], status_code=status.HTTP_201_CREATED)
 async def create_event(event_in: EventIn, current_user: str = Depends(get_current_user)):
     try:
         user = await User.get(current_user)
-        
-        participants: List[Participants] = list(map(lambda name: Participants(name=name, is_guest=True), event_in.participants))
-        participants = [Participants(name=user.first_name +  " " + user.last_name, user_id=user.id, is_guest=False)] + participants
-        
+
+        participants: List[Participants] = list(
+            map(lambda name: Participants(name=name, is_guest=True), event_in.participants))
+        participants = [Participants(
+            name=user.first_name + " " + user.last_name, user_id=user.id, is_guest=False)] + participants
+
         event_in.participants = participants
-        
+
         # event_in.participants.append(user.first_name)
         event = Events(
             **event_in.model_dump(),
-            creator=user.id,    
+            creator=user.id,
             total_amount=0.0,
             created_at=datetime.now(timezone.utc)
         )
@@ -34,28 +37,83 @@ async def create_event(event_in: EventIn, current_user: str = Depends(get_curren
 
         event_out = EventOut(
             **event.model_dump(),
-            totalAmount= event.total_amount,
-            createdAt= event.created_at
-            )
+            totalAmount=event.total_amount,
+            createdAt=event.created_at
+        )
         return ReponseWrapper(
             message="Event created successfully",
             data=event_out
         )
     except Exception as e:
         raise e
-    
+
+
+@router.get("/search", response_model=ReponseWrapper[List[EventsOut]], status_code=status.HTTP_200_OK)
+async def search_events(keyword: str, current_user: str = Depends(get_current_user)):
+    """
+    Search events by keyword. Search in:
+    - Event name
+    - Creator name (first_name + last_name)
+    - Participant names
+    """
+    try:
+        user = await User.get(current_user)
+
+        all_events = await Events.find({
+            "$or": [
+                {"creator": user.id},
+                {"participants.user_id": user.id}
+            ]
+        }).to_list()
+
+        filtered_events = []
+        keyword_lower = keyword.lower()
+
+        for event in all_events:
+            if keyword_lower in event.name.lower():
+                filtered_events.append(event)
+                continue
+
+            creator = await User.get(event.creator)
+            if creator:
+                creator_full_name = f"{creator.first_name} {creator.last_name}".lower(
+                )
+                if keyword_lower in creator_full_name:
+                    filtered_events.append(event)
+                    continue
+
+            for participant in event.participants:
+                if keyword_lower in participant.name.lower():
+                    filtered_events.append(event)
+                    break
+
+        result = [EventsOut(
+            **e.model_dump(),
+            participantsCount=len(e.participants),
+            totalAmount=e.total_amount,
+            createdAt=e.created_at
+        ) for e in filtered_events]
+
+        return ReponseWrapper(
+            message=f"Found {len(result)} event(s) matching keyword '{keyword}'",
+            data=result
+        )
+    except Exception as e:
+        raise e
+
+
 @router.get("/", response_model=ReponseWrapper[List[EventsOut]], status_code=status.HTTP_200_OK)
 async def find_events(current_user: str = Depends(get_current_user)):
     try:
         user = await User.get(current_user)
-        
+
         list_events = await Events.find({"creator": user.id}).to_list()
         result = [EventsOut(
             **e.model_dump(),
-            participantsCount= len(e.participants),
-            totalAmount= e.total_amount,
+            participantsCount=len(e.participants),
+            totalAmount=e.total_amount,
             createdAt=e.created_at
-            ) for e in list_events]
+        ) for e in list_events]
 
         return ReponseWrapper(
             message="Get all events successfully",
@@ -63,9 +121,10 @@ async def find_events(current_user: str = Depends(get_current_user)):
         )
     except Exception as e:
         raise e
-    
+
+
 @router.get("/{event_id}", response_model=ReponseWrapper[EventDetailOut], status_code=status.HTTP_200_OK)
-async def find_detail_event(event_id: str ,current_user: str = Depends(get_current_user)):
+async def find_detail_event(event_id: str, current_user: str = Depends(get_current_user)):
     try:
         event = await Events.get(event_id)
         if not event:
@@ -79,22 +138,23 @@ async def find_detail_event(event_id: str ,current_user: str = Depends(get_curre
         return ReponseWrapper(message="Find event successfully", data=result)
     except Exception as e:
         raise e
-    
+
+
 @router.patch("/{event_id}", response_model=ReponseWrapper[EventDetailOut], status_code=status.HTTP_200_OK)
-async def path_event(event_id: str ,event_in: EventUpdate ,current_user: str = Depends(get_current_user)):
+async def path_event(event_id: str, event_in: EventUpdate, current_user: str = Depends(get_current_user)):
     try:
         event = await Events.get(event_id)
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
-        
+
         update_data = event_in.model_dump(exclude_unset=True)
         if update_data:
             await event.set(update_data)
 
         event_out = EventDetailOut(
             **event.model_dump(),
-            totalAmount= event.total_amount,
-            createdAt= event.created_at
+            totalAmount=event.total_amount,
+            createdAt=event.created_at
         )
         return ReponseWrapper(
             message="Event updated successfully",
@@ -102,14 +162,15 @@ async def path_event(event_id: str ,event_in: EventUpdate ,current_user: str = D
         )
     except Exception as e:
         raise e
-    
+
+
 @router.delete("/{event_id}", response_model=ReponseWrapper[dict], status_code=status.HTTP_200_OK)
 async def delete_event(event_id: str, current_user: str = Depends(get_current_user)):
     try:
         event = await Events.get(event_id)
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
-        
+
         result = await event.delete()
         return ReponseWrapper(
             message="Delete event successfully",
@@ -118,12 +179,13 @@ async def delete_event(event_id: str, current_user: str = Depends(get_current_us
     except Exception as e:
         raise e
 
+
 @router.post("/add-bill/", response_model=ReponseWrapper[EventDetailOut], status_code=status.HTTP_200_OK)
 async def add_bill_to_event(event_id: str, bill_id: str, current_user: str = Depends(get_current_user)):
     try:
         event = await Events.get(event_id)
         if not event:
-            raise HTTPException(status_code=404, detail="Event not found")   
+            raise HTTPException(status_code=404, detail="Event not found")
         bill = await Bills.get(bill_id)
         if not bill:
             raise HTTPException(status_code=404, detail="Bill not found")
@@ -131,15 +193,15 @@ async def add_bill_to_event(event_id: str, bill_id: str, current_user: str = Dep
             {"bills._id": ObjectId(bill_id)}
         )
         if checking:
-            raise HTTPException(status_code=400, detail="Bill already in event")
-        
-        
+            raise HTTPException(
+                status_code=400, detail="Bill already in event")
+
         event.bills.append(bill)
         await event.save()
         result = EventDetailOut(
             **event.model_dump(),
-            totalAmount= event.total_amount,
-            createdAt= event.created_at
+            totalAmount=event.total_amount,
+            createdAt=event.created_at
         )
         return ReponseWrapper(
             message="Bill added to event successfully",
