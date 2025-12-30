@@ -8,6 +8,8 @@ from app.db.database import lifespan
 from app.dto.users import UserIn
 from app.models.users import User
 
+# hi
+
 app = FastAPI(title="Divvy App", lifespan=lifespan)
 
 def custom_openapi():
