@@ -43,6 +43,7 @@ _FONT_REGISTERED = False
 def _candidate_font_paths() -> list[Path]:
     """Possible font files that support extended Latin/Vietnamese characters."""
     base_dir = Path(__file__).resolve().parent.parent
+    print(base_dir)
     return [
         base_dir / "assets" / "fonts" / "DejaVuSans.ttf",
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
