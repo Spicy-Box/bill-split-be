@@ -127,7 +127,7 @@ class BillItemOut(BaseModel):
     quantity: int
     unit_price: float = Field(..., serialization_alias="unitPrice")
     total_price: float = Field(..., serialization_alias="totalPrice")
-    tax: float = Field(..., serialization_alias="tax")
+    tax: Optional[float] = Field(default=None, serialization_alias="tax")
     split_type: Optional[ItemSplitType] = Field(default=None, serialization_alias="splitType")
     # Trả ra đầy đủ thông tin người tham gia cho từng item
     split_between: Optional[List[Participants]] = Field(
