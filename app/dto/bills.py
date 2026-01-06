@@ -294,3 +294,20 @@ class EventBillsSummaryOut(BaseModel):
                 "currency": "VND"
             }
         }
+
+
+class RegisteredUsersExpenseOut(BaseModel):
+    """Total expense of registered users (non-guests) in an event"""
+    event_id: PydanticObjectId = Field(..., serialization_alias="eventId")
+    total_expense: float = Field(..., serialization_alias="totalExpense", description="Total expense of registered users (non-guests)")
+    currency: Optional[str] = Field(default=None, description="Event currency code")
+
+    class Config:
+        populate_by_name = True
+        json_schema_extra = {
+            "example": {
+                "eventId": "69383ff5d1b5eaf8f4a83136",
+                "totalExpense": 1200000,
+                "currency": "VND"
+            }
+        }

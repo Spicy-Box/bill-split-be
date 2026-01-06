@@ -26,7 +26,8 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from app.dto.base import ReponseWrapper, Participants
 from app.dto.bills import (
     BillCreateIn, BillOut, BillItemOut, UserShareOut, BillUpdateIn,
-    BillBalancesOut, BalanceItemOut, ListBillItemOut, EventBillsSummaryOut
+    BillBalancesOut, BalanceItemOut, ListBillItemOut, EventBillsSummaryOut,
+    RegisteredUsersExpenseOut
 )
 from app.models.bills import Bills, BillItem, UserShare, BillSplitType, ItemSplitType
 from app.models.events import Events, CurrencyEnum
@@ -1078,6 +1079,53 @@ async def get_event_bills_summary(event_id: str, current_user: str = Depends(get
         return ReponseWrapper(
             message="Event bills summary retrieved successfully",
             data=summary
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise e
+
+
+@router.get(
+    "/events/{event_id}/registered-users-expense",
+    response_model=ReponseWrapper[RegisteredUsersExpenseOut],
+    status_code=status.HTTP_200_OK,
+    description="Get total expense of registered users (non-guests) in an event"
+)
+async def get_registered_users_expense(event_id: str, current_user: str = Depends(get_current_user)):
+    """
+    Calculate total expense of registered users (non-guests) across all bills in an event.
+    A user is considered registered if is_guest=False OR user_id is not None.
+    """
+    try:
+        # Validate event exists
+        event = await _validate_event(event_id)
+        
+        # Get all bills for this event
+        event_oid = _parse_object_id(event_id)
+        bills = await Bills.find({"event_id": event_oid}).to_list()
+        
+        # Calculate total expense of registered users
+        total_expense = 0.0
+        for bill in bills:
+            for share in bill.per_user_shares:
+                # Check if user is registered: is_guest=False OR user_id is not None
+                user = share.user_name
+                if not user.is_guest or user.user_id is not None:
+                    total_expense += share.share
+        
+        # Get currency from event
+        currency_code = event.currency.name if event.currency else None
+        
+        result = RegisteredUsersExpenseOut(
+            event_id=event_oid,
+            total_expense=_round_share(total_expense),
+            currency=currency_code
+        )
+        
+        return ReponseWrapper(
+            message="Registered users expense calculated successfully",
+            data=result
         )
     except HTTPException:
         raise
