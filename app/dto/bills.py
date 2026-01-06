@@ -1,4 +1,5 @@
 from typing import List, Optional, Union, Annotated
+from beanie import PydanticObjectId
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.dto.base import Participants
@@ -269,3 +270,26 @@ class BillBalancesOut(BaseModel):
 class ListBillOut(BaseModel):
     """List of Bills output"""
     bills: List[BillOut]
+
+
+class EventBillsSummaryOut(BaseModel):
+    """Summary of all bills for an event"""
+    event_id: PydanticObjectId = Field(..., serialization_alias="eventId")
+    bill_count: int = Field(..., serialization_alias="billCount", description="Total number of bills")
+    total_subtotal: float = Field(..., serialization_alias="totalSubtotal", description="Sum of all subtotals")
+    total_tax_amount: float = Field(..., serialization_alias="totalTaxAmount", description="Sum of all tax amounts")
+    total_amount: float = Field(..., serialization_alias="totalAmount", description="Sum of all total amounts")
+    currency: Optional[str] = Field(default=None, description="Event currency code")
+
+    class Config:
+        populate_by_name = True
+        json_schema_extra = {
+            "example": {
+                "eventId": "69383ff5d1b5eaf8f4a83136",
+                "billCount": 3,
+                "totalSubtotal": 1500000,
+                "totalTaxAmount": 150000,
+                "totalAmount": 1650000,
+                "currency": "VND"
+            }
+        }

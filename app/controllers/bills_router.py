@@ -26,7 +26,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from app.dto.base import ReponseWrapper, Participants
 from app.dto.bills import (
     BillCreateIn, BillOut, BillItemOut, UserShareOut, BillUpdateIn,
-    BillBalancesOut, BalanceItemOut, ListBillItemOut
+    BillBalancesOut, BalanceItemOut, ListBillItemOut, EventBillsSummaryOut
 )
 from app.models.bills import Bills, BillItem, UserShare, BillSplitType, ItemSplitType
 from app.models.events import Events, CurrencyEnum
@@ -1032,6 +1032,53 @@ async def export_bill_pdf(bill_id: str, current_user: str = Depends(get_current_
         filename = f"Divvy_Bill_{bill.id}.pdf"
         headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
         return StreamingResponse(pdf_stream, media_type="application/pdf", headers=headers)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise e
+
+
+@router.get(
+    "/events/{event_id}/summary",
+    response_model=ReponseWrapper[EventBillsSummaryOut],
+    status_code=status.HTTP_200_OK,
+    description="Get summary of all bills for an event (total amounts, count, etc.)"
+)
+async def get_event_bills_summary(event_id: str, current_user: str = Depends(get_current_user)):
+    """
+    Calculate and return summary statistics for all bills in an event.
+    Returns total amounts, subtotals, tax amounts, bill count, and currency.
+    """
+    try:
+        # Validate event exists
+        event = await _validate_event(event_id)
+        
+        # Get all bills for this event
+        event_oid = _parse_object_id(event_id)
+        bills = await Bills.find({"event_id": event_oid}).to_list()
+        
+        # Calculate totals
+        bill_count = len(bills)
+        total_subtotal = sum(bill.subtotal for bill in bills)
+        total_tax_amount = sum(_calculate_tax_amount(bill) for bill in bills)
+        total_amount = sum(bill.total_amount for bill in bills)
+        
+        # Get currency from event
+        currency_code = event.currency.name if event.currency else None
+        
+        summary = EventBillsSummaryOut(
+            event_id=event_oid,
+            bill_count=bill_count,
+            total_subtotal=_round_share(total_subtotal),
+            total_tax_amount=_round_share(total_tax_amount),
+            total_amount=_round_share(total_amount),
+            currency=currency_code
+        )
+        
+        return ReponseWrapper(
+            message="Event bills summary retrieved successfully",
+            data=summary
+        )
     except HTTPException:
         raise
     except Exception as e:
