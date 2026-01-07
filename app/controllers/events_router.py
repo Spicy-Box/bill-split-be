@@ -197,7 +197,12 @@ async def delete_event(event_id: str, current_user: str = Depends(get_current_us
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
 
-        result = await event.delete()
+        # Xoá tất cả bills thuộc về event này
+        await Bills.find({"event_id": event.id}).delete()
+
+        # Sau đó xoá event
+        await event.delete()
+
         return ReponseWrapper(
             message="Delete event successfully",
             data={}
