@@ -110,8 +110,22 @@ class BillCreateIn(BaseModel):
                         "tax": 0,
                         "paid_by": "Alice",
                         "manual_shares": [
-                            {"user_name": "Alice", "amount": 10.0},
-                            {"user_name": "Bob", "amount": 5.0}
+                            {
+                                "user_name": {
+                                    "name": "Alice",
+                                    "user_id": None,
+                                    "is_guest": True
+                                },
+                                "amount": 10.0
+                            },
+                            {
+                                "user_name": {
+                                    "name": "Bob",
+                                    "user_id": None,
+                                    "is_guest": True
+                                },
+                                "amount": 5.0
+                            }
                         ]
                     }
                 }
@@ -186,7 +200,12 @@ class BillOut(BaseModel):
                         "unitPrice": 300000,
                         "totalPrice": 300000,
                         "splitType": "everyone",
-                        "splitBetween": ["Minh", "Hùng", "Lan", "Mai"]
+                        "splitBetween": [
+                            {"name": "Minh", "user_id": None, "is_guest": True},
+                            {"name": "Hùng", "user_id": None, "is_guest": True},
+                            {"name": "Lan", "user_id": None, "is_guest": True},
+                            {"name": "Mai", "user_id": None, "is_guest": True}
+                        ]
                     },
                     {
                         "id": "item_2",
@@ -195,7 +214,10 @@ class BillOut(BaseModel):
                         "unitPrice": 120000,
                         "totalPrice": 240000,
                         "splitType": "custom",
-                        "splitBetween": ["Minh", "Hùng"]
+                        "splitBetween": [
+                            {"name": "Minh", "user_id": None, "is_guest": True},
+                            {"name": "Hùng", "user_id": None, "is_guest": True}
+                        ]
                     },
                     {
                         "id": "item_3",
@@ -204,18 +226,52 @@ class BillOut(BaseModel):
                         "unitPrice": 30000,
                         "totalPrice": 90000,
                         "splitType": "custom",
-                        "splitBetween": ["Lan"]
+                        "splitBetween": [
+                            {"name": "Lan", "user_id": None, "is_guest": True}
+                        ]
                     }
                 ],
                 "subtotal": 630000,
                 "tax": 10,
                 "totalAmount": 693000,
-                "paidBy": "Minh",
+                "paidBy": {
+                    "name": "Minh",
+                    "user_id": None,
+                    "is_guest": True
+                },
                 "perUserShares": [
-                    {"userName": "Minh", "share": 214500},
-                    {"userName": "Hùng", "share": 214500},
-                    {"userName": "Lan", "share": 181500},
-                    {"userName": "Mai", "share": 82500}
+                    {
+                        "userName": {
+                            "name": "Minh",
+                            "user_id": None,
+                            "is_guest": True
+                        },
+                        "share": 214500
+                    },
+                    {
+                        "userName": {
+                            "name": "Hùng",
+                            "user_id": None,
+                            "is_guest": True
+                        },
+                        "share": 214500
+                    },
+                    {
+                        "userName": {
+                            "name": "Lan",
+                            "user_id": None,
+                            "is_guest": True
+                        },
+                        "share": 181500
+                    },
+                    {
+                        "userName": {
+                            "name": "Mai",
+                            "user_id": None,
+                            "is_guest": True
+                        },
+                        "share": 82500
+                    }
                 ]
             }
         }
