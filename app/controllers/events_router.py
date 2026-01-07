@@ -141,15 +141,41 @@ async def find_detail_event(event_id: str, current_user: str = Depends(get_curre
 
 
 @router.patch("/{event_id}", response_model=ReponseWrapper[EventDetailOut], status_code=status.HTTP_200_OK)
-async def path_event(event_id: str, event_in: EventUpdate, current_user: str = Depends(get_current_user)):
+async def patch_event(event_id: str, event_in: EventUpdate, current_user: str = Depends(get_current_user)):
     try:
         event = await Events.get(event_id)
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
 
+        # Chuẩn bị dữ liệu update từ body
         update_data = event_in.model_dump(exclude_unset=True)
-        if update_data:
-            await event.set(update_data)
+
+        # Nếu client gửi danh sách participant dạng chuỗi,
+        # ta sẽ chỉ cập nhật lại các participant guest (is_guest=True)
+        participants_names = update_data.pop("participants", None)
+
+        updates_to_apply = update_data.copy()
+
+        if participants_names is not None:
+            # Giữ lại các participant không phải guest (user thật)
+            non_guest_participants = [
+                p for p in event.participants if not p.is_guest
+            ]
+
+            # Chuyển danh sách tên mới thành Participants guest
+            new_guest_participants = [
+                Participants(name=name, is_guest=True) for name in participants_names
+            ]
+
+            # Gộp lại: user hiện tại + các user thật khác (nếu có) + guest mới
+            event.participants = non_guest_participants + new_guest_participants
+
+            # Đưa participants đã convert vào dict update để lưu DB
+            updates_to_apply["participants"] = event.participants
+
+        # Thực hiện update các field còn lại (name, currency, ...)
+        if updates_to_apply:
+            await event.set(updates_to_apply)
 
         event_out = EventDetailOut(
             **event.model_dump(),

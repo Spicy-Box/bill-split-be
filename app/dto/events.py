@@ -72,6 +72,4 @@ class EventDetailOut(BaseModel):
 class EventUpdate(BaseModel):
     name: Optional[str] = Field(default=None, description="Name of the event", examples=["Birthday Party"])
     currency: Optional[CurrencyEnum] = Field(default=None, description="Currency type for the event", examples=[1])
-    description: Optional[str] = Field(default=None, description="Description of the event", examples=["Đi nhậu cuối tuần"])
     participants: Optional[list[str]] = Field(default=None, description="List of participant name", examples=[["Alice", "Bob", "Charlie"]])
-    totalAmount: Optional[float] = Field(default=None, description="Total amount of money for the event", examples=[150.0])
