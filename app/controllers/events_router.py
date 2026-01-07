@@ -18,6 +18,8 @@ router = APIRouter(prefix='/events', tags=["Events"])
 async def create_event(event_in: EventIn, current_user: str = Depends(get_current_user)):
     try:
         user = await User.get(current_user)
+        
+        event_in.participants = event_in.participants[1:]
 
         participants: List[Participants] = list(
             map(lambda name: Participants(name=name, is_guest=True), event_in.participants))
