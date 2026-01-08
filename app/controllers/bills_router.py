@@ -161,12 +161,8 @@ def _detail_for_share(bill: Bills, share: UserShare, item_detail_map: Dict[str, 
         key = _participant_key(share.user_name)
         entries = item_detail_map.get(key)
         if entries:
-            # If there are many items, truncate and show count
-            if len(entries) > 3:
-                shown_entries = entries[:3]
-                remaining_count = len(entries) - 3
-                return f"{', '.join(shown_entries)}, and {remaining_count} more items"
-            return ", ".join(entries)
+            # Show all items with each item on a separate line and add spacing between items
+            return "<br/><br/>".join(entries)
         return "Shared specific items"
     if bill.bill_split_type == BillSplitType.EQUALLY:
         return "Split evenly across participants"
