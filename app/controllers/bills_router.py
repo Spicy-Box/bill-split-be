@@ -751,8 +751,22 @@ def _encode_bytes_to_base64(file_bytes):
                                 "tax": 0,
                                 "paid_by": "Alice",
                                 "manual_shares": [
-                                    {"user_name": "Alice", "amount": 10.0},
-                                    {"user_name": "Bob", "amount": 5.0}
+                                    {
+                                        "user_name": {
+                                            "name": "Alice",
+                                            "user_id": None,
+                                            "is_guest": True
+                                        },
+                                        "amount": 10.0
+                                    },
+                                    {
+                                        "user_name": {
+                                            "name": "Bob",
+                                            "user_id": None,
+                                            "is_guest": True
+                                        },
+                                        "amount": 5.0
+                                    }
                                 ]
                             }
                         }
