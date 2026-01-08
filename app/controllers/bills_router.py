@@ -161,6 +161,11 @@ def _detail_for_share(bill: Bills, share: UserShare, item_detail_map: Dict[str, 
         key = _participant_key(share.user_name)
         entries = item_detail_map.get(key)
         if entries:
+            # If there are many items, truncate and show count
+            if len(entries) > 3:
+                shown_entries = entries[:3]
+                remaining_count = len(entries) - 3
+                return f"{', '.join(shown_entries)}, and {remaining_count} more items"
             return ", ".join(entries)
         return "Shared specific items"
     if bill.bill_split_type == BillSplitType.EQUALLY:
@@ -210,24 +215,33 @@ def _build_bill_pdf(bill: Bills, event: Events, balances: BillBalancesOut) -> By
 
     elements.append(Paragraph("Divvy", app_style))
     elements.append(Paragraph("Bill Receipt", heading_style))
-    elements.append(Paragraph(f"Ref ID: #{str(bill.id)[-8:].upper()}", sub_heading_style))
+    elements.append(
+        Paragraph(f"Ref ID: #{str(bill.id)[-8:].upper()}", sub_heading_style))
+
+    info_value_style = ParagraphStyle(
+        name="InfoValue",
+        parent=base_style,
+        fontSize=10,
+        leading=12,
+        wordWrap='CJK',
+        textColor=colors.HexColor("#2C3E50"),
+    )
 
     info_rows = [
-        ["Bill Title", bill.title],
-        ["Event", getattr(event, "name", "-")],
+        ["Bill Title", Paragraph(bill.title, info_value_style)],
+        ["Event", Paragraph(getattr(event, "name", "-"), info_value_style)],
         ["Date", formatted_date],
         ["Currency", f"{currency_meta['code']} ({currency_meta['symbol']})"],
         ["Split Method", _get_split_type_label(bill.bill_split_type)],
     ]
     if bill.note:
-        info_rows.append(["Note", bill.note])
+        info_rows.append(["Note", Paragraph(bill.note, info_value_style)])
 
-    info_table = Table(info_rows, hAlign="LEFT", colWidths=[40 * mm, 100 * mm])
+    info_table = Table(info_rows, hAlign="LEFT", colWidths=[45 * mm, None])
     info_table.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), font_name),
         ("FONTSIZE", (0, 0), (-1, -1), 10),
         ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#7F8C8D")),
-        ("TEXTCOLOR", (1, 0), (1, -1), colors.HexColor("#2C3E50")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("padding", (0, 0), (-1, -1), 4),
     ]))
@@ -235,39 +249,54 @@ def _build_bill_pdf(bill: Bills, event: Events, balances: BillBalancesOut) -> By
     elements.append(Spacer(1, 6))
 
     elements.append(Paragraph("Receipt Details", section_style))
-    
+
+    item_name_style = ParagraphStyle(
+        name="ItemName",
+        parent=base_style,
+        fontSize=10,
+        leading=12,
+        wordWrap='CJK',
+    )
+
     items_data = [["Item Name", "Qty", "Price", "Total"]]
     for item in bill.items:
+        item_name_paragraph = Paragraph(item.name, item_name_style)
+
         items_data.append([
-            item.name,
+            item_name_paragraph,
             f"x{item.quantity}",
             _format_currency(item.unit_price, currency),
             _format_currency(item.total_price, currency),
         ])
 
-    items_table = Table(items_data, hAlign="LEFT", colWidths=[85 * mm, 20 * mm, 35 * mm, 40 * mm])
+    items_table = Table(items_data, hAlign="LEFT", colWidths=[
+                        85 * mm, 20 * mm, 35 * mm, 40 * mm])
     items_table.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), font_name),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#34495E")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
         ("ALIGN", (0, 0), (0, -1), "LEFT"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("PADDING", (0, 0), (-1, -1), 8),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#ECF0F1")),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8F9F9")]),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+         [colors.white, colors.HexColor("#F8F9F9")]),
     ]))
     elements.append(items_table)
-
 
     summary_data = [
         ["Subtotal", _format_currency(bill.subtotal, currency)],
     ]
     if tax_amount > 0:
         tax_percent = int(bill.tax) if bill.tax.is_integer() else bill.tax
-        summary_data.append([f"Tax ({tax_percent}%)", _format_currency(tax_amount, currency)])
-    summary_data.append(["TOTAL", _format_currency(bill.total_amount, currency)])
+        summary_data.append(
+            [f"Tax ({tax_percent}%)", _format_currency(tax_amount, currency)])
+    summary_data.append(
+        ["TOTAL", _format_currency(bill.total_amount, currency)])
 
-    summary_table = Table(summary_data, hAlign="RIGHT", colWidths=[40 * mm, 40 * mm])
+    summary_table = Table(summary_data, hAlign="RIGHT",
+                          colWidths=[40 * mm, 40 * mm])
     summary_table.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), font_name),
         ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
@@ -286,7 +315,8 @@ def _build_bill_pdf(bill: Bills, event: Events, balances: BillBalancesOut) -> By
 
     payer_name = _participant_display(bill.paid_by)
     paid_by_data = [[f"PAID BY", payer_name]]
-    paid_by_table = Table(paid_by_data, hAlign="LEFT", colWidths=[30 * mm, 150 * mm])
+    paid_by_table = Table(paid_by_data, hAlign="LEFT",
+                          colWidths=[30 * mm, 150 * mm])
     paid_by_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FEF9E7")),
         ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#F1C40F")),
@@ -304,25 +334,38 @@ def _build_bill_pdf(bill: Bills, event: Events, balances: BillBalancesOut) -> By
     elements.append(Paragraph("Tax included", sub_heading_style))
     detail_map = _build_item_detail_map(bill)
     breakdown_rows = [["Member", "Share Amount", "Allocation Details"]]
-    
+
+    allocation_style = ParagraphStyle(
+        name="AllocationDetails",
+        parent=base_style,
+        fontSize=9,
+        leading=11,
+        wordWrap='CJK',
+    )
+
     if bill.per_user_shares:
         for share in bill.per_user_shares:
+            allocation_text = _detail_for_share(bill, share, detail_map)
+            allocation_paragraph = Paragraph(allocation_text, allocation_style)
+
             breakdown_rows.append([
                 _participant_display(share.user_name),
                 _format_currency(share.share, currency),
-                _detail_for_share(bill, share, detail_map),
+                allocation_paragraph,
             ])
     else:
         breakdown_rows.append(["-", "-", "No participants"])
 
-    breakdown_table = Table(breakdown_rows, hAlign="LEFT", colWidths=[50 * mm, 35 * mm, 95 * mm])
+    breakdown_table = Table(breakdown_rows, hAlign="LEFT", colWidths=[
+                            50 * mm, 35 * mm, 95 * mm])
     breakdown_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#16A085")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, -1), font_name),
         ("ALIGN", (1, 1), (1, -1), "RIGHT"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#EAFAF1")]),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+         [colors.white, colors.HexColor("#EAFAF1")]),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D5DBDB")),
         ("PADDING", (0, 0), (-1, -1), 6),
     ]))
@@ -339,8 +382,9 @@ def _build_bill_pdf(bill: Bills, event: Events, balances: BillBalancesOut) -> By
                 _participant_display(balance.creditor),
                 _format_currency(balance.amount_owed, currency)
             ])
-        
-        settlement_table = Table(settlement_data, hAlign="LEFT", colWidths=[55 * mm, 15 * mm, 55 * mm, 55 * mm])
+
+        settlement_table = Table(settlement_data, hAlign="LEFT", colWidths=[
+                                 55 * mm, 15 * mm, 55 * mm, 55 * mm])
         settlement_table.setStyle(TableStyle([
             ("FONTNAME", (0, 0), (-1, 0), font_name),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#7F8C8D")),
@@ -355,7 +399,8 @@ def _build_bill_pdf(bill: Bills, event: Events, balances: BillBalancesOut) -> By
             ("TEXTCOLOR", (3, 1), (3, -1), colors.HexColor("#C0392B")),
             ("FONTSIZE", (3, 1), (3, -1), 11),
 
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#FDEDEC")]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1),
+             [colors.white, colors.HexColor("#FDEDEC")]),
         ]))
         elements.append(settlement_table)
     else:
@@ -363,15 +408,16 @@ def _build_bill_pdf(bill: Bills, event: Events, balances: BillBalancesOut) -> By
             [[Paragraph("✅ Everyone is settled up for this bill.", base_style)]],
             colWidths=[180*mm],
             style=[
-                ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#EAFAF1")),
-                ("ALIGN", (0,0), (-1,-1), "CENTER"),
-                ("PADDING", (0,0), (-1,-1), 12),
-                ("BOX", (0,0), (-1,-1), 1, colors.HexColor("#2ECC71"))
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#EAFAF1")),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("PADDING", (0, 0), (-1, -1), 12),
+                ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#2ECC71"))
             ]
         ))
 
     elements.append(Spacer(1, 20))
-    elements.append(Paragraph(f"Exported by Divvy App on {formatted_date}", app_style))
+    elements.append(
+        Paragraph(f"Exported by Divvy App on {formatted_date}", app_style))
 
     doc.build(elements)
     buffer.seek(0)
@@ -1053,20 +1099,20 @@ async def get_event_bills_summary(event_id: str, current_user: str = Depends(get
     try:
         # Validate event exists
         event = await _validate_event(event_id)
-        
+
         # Get all bills for this event
         event_oid = _parse_object_id(event_id)
         bills = await Bills.find({"event_id": event_oid}).to_list()
-        
+
         # Calculate totals
         bill_count = len(bills)
         total_subtotal = sum(bill.subtotal for bill in bills)
         total_tax_amount = sum(_calculate_tax_amount(bill) for bill in bills)
         total_amount = sum(bill.total_amount for bill in bills)
-        
+
         # Get currency from event
         currency_code = event.currency.name if event.currency else None
-        
+
         summary = EventBillsSummaryOut(
             event_id=event_oid,
             bill_count=bill_count,
@@ -1075,7 +1121,7 @@ async def get_event_bills_summary(event_id: str, current_user: str = Depends(get
             total_amount=_round_share(total_amount),
             currency=currency_code
         )
-        
+
         return ReponseWrapper(
             message="Event bills summary retrieved successfully",
             data=summary
@@ -1100,11 +1146,11 @@ async def get_registered_users_expense(event_id: str, current_user: str = Depend
     try:
         # Validate event exists
         event = await _validate_event(event_id)
-        
+
         # Get all bills for this event
         event_oid = _parse_object_id(event_id)
         bills = await Bills.find({"event_id": event_oid}).to_list()
-        
+
         # Calculate total expense of registered users
         total_expense = 0.0
         for bill in bills:
@@ -1113,16 +1159,16 @@ async def get_registered_users_expense(event_id: str, current_user: str = Depend
                 user = share.user_name
                 if not user.is_guest or user.user_id is not None:
                     total_expense += share.share
-        
+
         # Get currency from event
         currency_code = event.currency.name if event.currency else None
-        
+
         result = RegisteredUsersExpenseOut(
             event_id=event_oid,
             total_expense=_round_share(total_expense),
             currency=currency_code
         )
-        
+
         return ReponseWrapper(
             message="Registered users expense calculated successfully",
             data=result
